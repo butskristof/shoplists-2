@@ -1,0 +1,17 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.0">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <UserSecretsId>e4f461b9-ca42-4c11-82eb-45daaf25980c</UserSecretsId>
+        <AssemblyName>Shoplists.AppHost</AssemblyName>
+        <RootNamespace>Shoplists.AppHost</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.2.0" />
+    </ItemGroup>
+
+</Project>
