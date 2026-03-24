@@ -12,8 +12,8 @@
       "type": "stdio",
       "command": "aspire",
       "args": [
-        "mcp",
-        "start"
+        "agent",
+        "mcp"
       ],
       "env": {}
     },

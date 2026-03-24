@@ -52,7 +52,8 @@ See `README.md` for feature ideas.
 ### Infrastructure & Local Development
 - **Orchestration**: Aspire (AppHost) manages the full local stack — backend services, frontend
   dev server, PostgreSQL, and any other dependencies. 
-- **To run locally**: Start the Aspire AppHost (from Rider or CLI). It spins up everything.
+- **To run locally**: Run `aspire run` from the repo root. It spins up everything.
+  Aspire assigns ports dynamically — use the Aspire MCP to discover resource URLs.
 - **Authentication**: OpenID Connect to an external provider (Pocket ID or Entra External ID).
   Auth is NOT a concern of this application — we plug in via standard OIDC on both frontend and backend.
 - **CI/CD**: GitHub Actions (TBD). PR validations will enforce build, test, and lint checks.
@@ -66,7 +67,7 @@ The following MCP servers are configured in `.mcp.json` and available to agents:
 |---|---|---|
 | **nuxt** | Nuxt documentation, modules, deploy providers, changelog | Nuxt 4 API questions, module discovery, deployment config |
 | **mslearn** | Microsoft Learn docs search, fetch, and code samples | .NET, EF Core, Aspire, and any Microsoft technology |
-| **aspire** | Inspect running Aspire resources, logs, and traces | Local dev diagnostics — check resource status, view logs, inspect traces |
+| **aspire** | Inspect running Aspire resources, logs, and traces | Local dev diagnostics — check resource status, discover dynamically assigned URLs, view logs, inspect traces |
 | **playwright** | Full browser automation (navigate, click, fill, screenshot, snapshot) | UI verification during and after implementation — no Playwright test code in repo |
 | **context7** | Up-to-date documentation and code examples for any library | General-purpose doc lookup for libraries not covered by nuxt/mslearn |
 
