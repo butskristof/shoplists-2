@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "nuxt": {
+      "type": "http",
+      "url": "https://nuxt.com/mcp"
+    },
+    "mslearn": {
+      "type": "http",
+      "url": "https://learn.microsoft.com/api/mcp"
+    },
+    "aspire": {
+      "type": "stdio",
+      "command": "aspire",
+      "args": [
+        "mcp",
+        "start"
+      ],
+      "env": {}
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "env": {}
+    }
+  }
+}
