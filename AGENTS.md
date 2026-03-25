@@ -30,7 +30,7 @@ See `README.md` for feature ideas.
 - **Node**: Latest LTS (currently v24)
 - **Package manager**: npm
 - **CSS**: Native CSS (with nesting). **No Tailwind — this is non-negotiable.**
-- **UI library**: TBD (likely PrimeVue)
+- **UI library**: PrimeVue v4 (Aura preset, styled mode with design tokens / CSS variables)
 - **API client generation**: TBD (possibly Nuxt Open Fetch module; decide based on current Nuxt best practices)
 - **Testing**: Use Playwright via MCP tooling during implementation to functionally and visually verify
   changes. No Playwright test code in the repo — testing is done interactively by the agent.
@@ -69,12 +69,14 @@ The following MCP servers are configured in `.mcp.json` and available to agents:
 | **mslearn** | Microsoft Learn docs search, fetch, and code samples | .NET, EF Core, Aspire, and any Microsoft technology |
 | **aspire** | Inspect running Aspire resources, logs, and traces | Local dev diagnostics — check resource status, discover dynamically assigned URLs, view logs, inspect traces |
 | **playwright** | Full browser automation (navigate, click, fill, screenshot, snapshot) | UI verification during and after implementation — no Playwright test code in repo |
-| **context7** | Up-to-date documentation and code examples for any library | General-purpose doc lookup for libraries not covered by nuxt/mslearn |
+| **primevue** | PrimeVue v4 component docs, props, events, slots, theming, accessibility | PrimeVue component APIs, design tokens, passthrough, theming, usage examples |
+| **context7** | Up-to-date documentation and code examples for any library | General-purpose doc lookup for libraries not covered by dedicated MCP servers |
 
 **Tool selection guidance for documentation lookups:**
 - Nuxt 4 / Vue / Nitro → **nuxt** MCP (primary), **context7** (supplementary)
 - .NET / EF Core / Aspire / Minimal APIs → **mslearn** MCP (primary), **context7** (supplementary)
-- Other libraries (PrimeVue, test frameworks, mediator libs, etc.) → **context7**
+- PrimeVue v4 (components, theming, design tokens) → **primevue** MCP (primary), **context7** (supplementary)
+- Other libraries (test frameworks, mediator libs, etc.) → **context7**
 - Always prefer a dedicated MCP tool over web search when one exists for the technology.
 
 ---
@@ -109,6 +111,7 @@ Technologies requiring doc verification:
 - Aspire (all versions — not ".NET Aspire", just "Aspire" since the polyglot rebrand) → **mslearn**
 - TUnit (or whichever test framework is chosen) → **context7**
 - Nuxt 4 → **nuxt** MCP
+- PrimeVue v4 (design tokens, component APIs) → **primevue** MCP
 - Any mediator library chosen → **context7**
 - EF Core with .NET 10 (verify new APIs/patterns) → **mslearn**
 - Any other library added that is < 1 year old or in preview → **context7**
@@ -161,9 +164,9 @@ this file updated accordingly.
 | Mediator library | MediatR alternatives due to license changes | Not started |
 | Result/error pattern library | For application layer error handling | Not started |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
-| UI library | Likely PrimeVue | Not started |
+| UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Native CSS with nesting for now | Not started |
 | API client generation | Nuxt Open Fetch or alternative | Not started |
 | API documentation UI | Likely Scalar | Not started |
-| Code style configuration | editorconfig, CSharpier, ESLint, Prettier | Not started |
+| Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config (ESLint Stylistic, no Prettier). Backend: CSharpier (TBD). .editorconfig in place. | **Decided (frontend)** |
 | CI/CD pipeline | GitHub Actions configuration | Not started |

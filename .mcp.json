@@ -34,6 +34,15 @@
         "@upstash/context7-mcp"
       ],
       "env": {}
+    },
+    "primevue": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@primevue/mcp"
+      ],
+      "env": {}
     }
   }
 }
