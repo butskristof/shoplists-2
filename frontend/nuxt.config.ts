@@ -11,6 +11,7 @@ export default defineNuxtConfig({
     "primeicons/primeicons.css",
     "~/styles/reset.css",
     "~/styles/main.css",
+    "~/styles/custom.css",
   ],
 
   fonts: {
