@@ -1,0 +1,4 @@
+/* "link button" should not have underlined text */
+a.p-button {
+  text-decoration: none;
+}
