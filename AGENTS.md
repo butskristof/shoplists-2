@@ -30,6 +30,11 @@ See `README.md` for feature ideas.
 - **Node**: Latest LTS (currently v24)
 - **Package manager**: npm
 - **CSS**: Native CSS (with nesting). **No Tailwind — this is non-negotiable.**
+  - Scoped `<style scoped>` in SFC components for all layout/styling
+  - PrimeVue design tokens (CSS variables like `var(--p-surface-0)`) for all colors — they auto-switch
+    between light/dark mode
+  - Breakpoints: mobile < 1024px, desktop >= 1024px (`@media (min-width: 1024px)`)
+- **Icons**: PrimeIcons (via `primeicons` npm package, CSS imported in nuxt config)
 - **UI library**: PrimeVue v4 (Aura preset, styled mode with design tokens / CSS variables)
 - **API client generation**: TBD (possibly Nuxt Open Fetch module; decide based on current Nuxt best practices)
 - **Testing**: Use Playwright via MCP tooling during implementation to functionally and visually verify
@@ -165,7 +170,7 @@ this file updated accordingly.
 | Result/error pattern library | For application layer error handling | Not started |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
-| CSS approach details | Native CSS with nesting for now | Not started |
+| CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
 | API client generation | Nuxt Open Fetch or alternative | Not started |
 | API documentation UI | Likely Scalar | Not started |
 | Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config (ESLint Stylistic, no Prettier). Backend: CSharpier (TBD). .editorconfig in place. | **Decided (frontend)** |
