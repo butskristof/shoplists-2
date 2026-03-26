@@ -1,0 +1,71 @@
+:root {
+  /* Spacing */
+  --default-spacing: 1rem;
+  --spacing-xs: calc(var(--default-spacing) / 4);
+  --spacing-sm: calc(var(--default-spacing) / 2);
+  --spacing-md: var(--default-spacing);
+  --spacing-lg: calc(var(--default-spacing) * 2);
+  --spacing-xl: calc(var(--default-spacing) * 4);
+
+  /* Breakpoints */
+  --breakpoint-sm: 640px; /* 40 rem */
+  --breakpoint-md: 768px; /* 48 rem */
+  --breakpoint-lg: 1024px; /* 64 rem */
+  --breakpoint-xl: 1280px; /* 80 rem */
+
+  /* Font weights */
+  --weight-thin: 100;
+  --weight-extralight: 200;
+  --weight-light: 300;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+  --weight-black: 900;
+
+  /* Font sizes */
+  /* based off of 1rem = 14px */
+  --font-size-xs: 0.75rem;
+  --font-size-xs--line-height: calc(1 / 0.75);
+  --font-size-sm: 0.875rem;
+  --font-size-sm--line-height: calc(1.25 / 0.875);
+  --font-size-base: 1rem;
+  --font-size-base--line-height: calc(1.5 / 1);
+  --font-size-lg: 1.125rem;
+  --font-size-lg--line-height: calc(1.75 / 1.125);
+  --font-size-xl: 1.25rem;
+  --font-size-xl--line-height: calc(1.75 / 1.25);
+  --font-size-2xl: 1.5rem;
+  --font-size-2xl--line-height: calc(2 / 1.5);
+  --font-size-3xl: 1.875rem;
+  --font-size-3xl--line-height: calc(2.25 / 1.875);
+  --font-size-4xl: 2.25rem;
+  --font-size-4xl--line-height: calc(2.5 / 2.25);
+  --font-size-5xl: 3rem;
+  --font-size-5xl--line-height: 1;
+  --font-size-6xl: 3.75rem;
+  --font-size-6xl--line-height: 1;
+  --font-size-7xl: 4.5rem;
+  --font-size-7xl--line-height: 1;
+  --font-size-8xl: 6rem;
+  --font-size-8xl--line-height: 1;
+  --font-size-9xl: 8rem;
+  --font-size-9xl--line-height: 1;
+}
+
+/* Font size utility classes — bundle font-size + line-height */
+/* no mixin-style solution unfortunately */
+/*.text-xs { font-size: var(--font-size-xs); line-height: var(--font-size-xs--line-height); }*/
+/*.text-sm { font-size: var(--font-size-sm); line-height: var(--font-size-sm--line-height); }*/
+/*.text-base { font-size: var(--font-size-base); line-height: var(--font-size-base--line-height); }*/
+/*.text-lg { font-size: var(--font-size-lg); line-height: var(--font-size-lg--line-height); }*/
+/*.text-xl { font-size: var(--font-size-xl); line-height: var(--font-size-xl--line-height); }*/
+/*.text-2xl { font-size: var(--font-size-2xl); line-height: var(--font-size-2xl--line-height); }*/
+/*.text-3xl { font-size: var(--font-size-3xl); line-height: var(--font-size-3xl--line-height); }*/
+/*.text-4xl { font-size: var(--font-size-4xl); line-height: var(--font-size-4xl--line-height); }*/
+/*.text-5xl { font-size: var(--font-size-5xl); line-height: var(--font-size-5xl--line-height); }*/
+/*.text-6xl { font-size: var(--font-size-6xl); line-height: var(--font-size-6xl--line-height); }*/
+/*.text-7xl { font-size: var(--font-size-7xl); line-height: var(--font-size-7xl--line-height); }*/
+/*.text-8xl { font-size: var(--font-size-8xl); line-height: var(--font-size-8xl--line-height); }*/
+/*.text-9xl { font-size: var(--font-size-9xl); line-height: var(--font-size-9xl--line-height); }*/

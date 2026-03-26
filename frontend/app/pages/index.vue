@@ -2,8 +2,12 @@
 </script>
 
 <template>
-  <div class="index-page">
+  <div class="index-page app-container">
     <h1>Hello</h1>
+    <NuxtLink :to="{ name: 'lists-id', params: { id: 'weekly-groceries' } }">
+      Weekly groceries
+    </NuxtLink>
+    <ComponentDemo />
   </div>
 </template>
 
@@ -12,7 +16,5 @@
   display: flex;
   flex-direction: column;
   gap: var(--default-spacing);
-
-  padding: var(--default-spacing);
 }
 </style>

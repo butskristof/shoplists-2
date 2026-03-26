@@ -19,13 +19,10 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  padding: var(--spacing-lg);
-}
 
-.app-content {
-  flex: 1;
-  background: var(--p-surface-0);
-  border-radius: calc(var(--default-spacing) * 0.75);
-  border: 1px solid var(--p-surface-200);
+  padding: var(--default-spacing);
+  @media (min-width: 768px) {
+    padding: var(--spacing-lg);
+  }
 }
 </style>
