@@ -9,5 +9,8 @@ export default withNuxt(
       quotes: "double",
       semi: true,
     },
+    formatters: {
+      css: true,
+    },
   }),
 );

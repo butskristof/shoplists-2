@@ -2,9 +2,7 @@
   <div class="app-shell">
     <AppHeader />
     <main class="app-main">
-      <div class="app-content">
-        <slot />
-      </div>
+      <slot />
     </main>
   </div>
 </template>
@@ -28,6 +26,6 @@
   flex: 1;
   background: var(--p-surface-0);
   border-radius: calc(var(--default-spacing) * 0.75);
-  border: 2px dashed var(--p-surface-200);
+  border: 1px solid var(--p-surface-200);
 }
 </style>

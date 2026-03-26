@@ -23,6 +23,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "^7.7.3",
     "@nuxt/eslint": "^1.15.2",
-    "@primevue/nuxt-module": "^4.5.4"
+    "@primevue/nuxt-module": "^4.5.4",
+    "eslint-plugin-format": "^2.0.1"
   }
 }
