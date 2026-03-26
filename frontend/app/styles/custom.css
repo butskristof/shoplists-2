@@ -1,3 +1,5 @@
+/* put special overrides and theming here such as changes to Primevue, default component styling, ... */
+
 /* "link button" should not have underlined text */
 a.p-button {
   text-decoration: none;

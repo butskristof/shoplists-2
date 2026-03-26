@@ -10,12 +10,14 @@ export default defineNuxtConfig({
   css: [
     "primeicons/primeicons.css",
     "~/styles/reset.css",
+    "~/styles/utilities.css",
     "~/styles/main.css",
     "~/styles/custom.css",
   ],
 
   fonts: {
     defaults: {
+      // load in everything until we get a sense of what we actually use
       weights: [100, 200, 300, 400, 500, 600, 700, 800, 900],
     },
   },
