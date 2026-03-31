@@ -3,7 +3,7 @@
 
 <template>
   <div class="app-header">
-    <div class="app-container">
+    <div class="app-container header-content">
       <div class="logo">
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path
@@ -23,7 +23,15 @@
 
 <style scoped>
 .app-header {
-  background-color: var(--p-surface-0);
+  background-color: var(--p-content-background);
+  border-bottom: 1px solid var(--p-content-border-color);
+
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-content {
   padding: var(--default-spacing);
   @media (min-width: 768px) {
     padding-block: var(--spacing-md);
@@ -35,17 +43,6 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-lg);
-
-  border-bottom: 1px solid var(--p-surface-200);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-
-  /*
-  DARK
-  background surface 900
-  border surface 800
-   */
 }
 
 .logo {
@@ -58,13 +55,11 @@
   line-height: var(--font-size-2xl--line-height);
 
   .svg-path {
-    fill: var(--p-surface-900);
-    /* DARK surface 0 */
+    fill: var(--p-text-color);
   }
 
   .name {
-    color: var(--p-surface-900);
-    /* DARK surface 100 */
+    color: var(--p-text-color);
     font-weight: var(--weight-semibold);
   }
 }

@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-03-25",
   devtools: { enabled: true },
 
-  modules: ["@primevue/nuxt-module", "@nuxt/fonts", "@nuxt/eslint"],
+  modules: ["@primevue/nuxt-module", "@nuxt/fonts", "@nuxt/eslint", "@nuxtjs/color-mode"],
 
   css: [
     "primeicons/primeicons.css",
@@ -27,7 +27,7 @@ export default defineNuxtConfig({
       theme: {
         preset: Aura,
         options: {
-          darkModeSelector: "system",
+          darkModeSelector: ".dark-mode",
           cssLayer: {
             name: "primevue",
             order: "reset, primevue",
@@ -35,6 +35,12 @@ export default defineNuxtConfig({
         },
       },
     },
+  },
+
+  colorMode: {
+    preference: "system",
+    fallback: "light",
+    classSuffix: "-mode",
   },
 
   typescript: {

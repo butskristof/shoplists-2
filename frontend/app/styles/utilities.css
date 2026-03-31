@@ -1,4 +1,6 @@
 :root {
+  --app-background: var(--p-surface-50);
+
   /* Spacing */
   --default-spacing: 1rem;
   --spacing-xs: calc(var(--default-spacing) / 4);
@@ -52,6 +54,10 @@
   --font-size-8xl--line-height: 1;
   --font-size-9xl: 8rem;
   --font-size-9xl--line-height: 1;
+}
+
+.dark-mode {
+  --app-background: var(--p-surface-950);
 }
 
 /* Font size utility classes — bundle font-size + line-height */

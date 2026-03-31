@@ -3,6 +3,7 @@
     <AppHeader />
     <main class="app-main">
       <slot />
+      <AppFooter />
     </main>
   </div>
 </template>
@@ -12,7 +13,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--p-surface-50);
+  background-color: var(--app-background);
 }
 
 .app-main {

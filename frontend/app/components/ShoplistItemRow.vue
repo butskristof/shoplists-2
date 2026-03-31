@@ -206,6 +206,10 @@ function confirmDelete(event: Event) {
 @media (hover: hover) {
   .item-row:not(.item-row--editing):hover {
     background: var(--p-surface-100);
+
+    .dark-mode & {
+      background-color: var(--p-surface-800);
+    }
   }
 }
 </style>
