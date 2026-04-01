@@ -10,3 +10,10 @@ export interface Shoplist {
   name: string;
   items: ShoplistItem[];
 }
+
+export interface ShoplistSummary {
+  id: string;
+  name: string;
+  itemCount: number;
+  doneCount: number;
+}

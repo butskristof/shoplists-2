@@ -30,6 +30,10 @@
   align-items: center;
   justify-content: flex-end;
 
-  border-top: 1px solid var(--p-content-border-color);
+  //border-top: 1px solid var(--p-content-border-color);
+
+  .actions {
+    margin-right: calc(-1 * var(--p-button-padding-x));
+  }
 }
 </style>
