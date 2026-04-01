@@ -1,9 +1,9 @@
-import type { Shoplist, ShoplistItem } from "~/types/shoplist";
+import type { Shoplist, ShoplistItem, ShoplistSummary } from "~/types/shoplist";
 
 const MOCK_DATA: Record<string, Shoplist> = {
   "weekly-groceries": {
     id: "weekly-groceries",
-    name: "Weekly groceries with a very long name for the list",
+    name: "Weekly groceries with a very long name for the list which really takes up all the space",
     items: [
       { id: "1", name: "Bananas", done: false, position: 1 },
       { id: "2", name: "Whole milk", done: false, position: 2 },
@@ -15,10 +15,48 @@ const MOCK_DATA: Record<string, Shoplist> = {
       { id: "8", name: "Greek yogurt", done: true, position: 8 },
     ],
   },
+  "birthday-party": {
+    id: "birthday-party",
+    name: "Birthday party supplies",
+    items: [
+      { id: "bp-1", name: "Cake mix", done: true, position: 1 },
+      { id: "bp-2", name: "Candles", done: true, position: 2 },
+      { id: "bp-3", name: "Balloons", done: true, position: 3 },
+      { id: "bp-4", name: "Paper plates", done: true, position: 4 },
+      { id: "bp-5", name: "Napkins", done: true, position: 5 },
+    ],
+  },
+  "weeknight-pasta": {
+    id: "weeknight-pasta",
+    name: "Weeknight pasta",
+    items: [
+      { id: "wp-1", name: "Spaghetti", done: false, position: 1 },
+      { id: "wp-2", name: "Pancetta", done: false, position: 2 },
+      { id: "wp-3", name: "Parmesan", done: true, position: 3 },
+    ],
+  },
+  "empty-list": {
+    id: "empty-list",
+    name: "New list",
+    items: [],
+  },
 };
 
 function findItem(items: ShoplistItem[], itemId: string): ShoplistItem | undefined {
   return items.find(i => i.id === itemId);
+}
+
+export function useShoplists() {
+  const lists = computed<ShoplistSummary[]>(() =>
+    Object.values(MOCK_DATA).map(list => ({
+      id: list.id,
+      name: list.name,
+      itemCount: list.items.length,
+      doneCount: list.items.filter(i => i.done).length,
+    })),
+  );
+
+  return { lists };
 }
 
 export function useShoplist(listId: string) {
