@@ -1,18 +1,45 @@
 <script setup lang="ts">
+import { useDraggable } from "vue-draggable-plus";
+
 const route = useRoute();
 const listId = route.params.id as string;
 
 const {
   list,
+  sortedItems,
   itemsToGet,
   doneItems,
   toggleItem,
   addItem,
   deleteItem,
   updateItemName,
+  reorderItem,
 } = useShoplist(listId);
 
 const isEditMode = ref(false);
+const editList = ref<HTMLElement | null>(null);
+const { start, destroy } = useDraggable(editList, {
+  immediate: false,
+  handle: ".drag-handle",
+  animation: 150,
+  onUpdate(evt) {
+    const itemId = evt.item.dataset?.itemId;
+    if (itemId == null || evt.newIndex == null)
+      return;
+    reorderItem(itemId, evt.newIndex + 1);
+  },
+});
+
+watch([isEditMode, editList], ([editMode, el]) => {
+  if (editMode && el)
+    start();
+  else
+    destroy();
+  // immediate true: run on first page load (if starting in edit mode already)
+  // flush post: watcher runs after DOM changes, so editList ref should already be populated
+  // prevents the watcher running twice: once for isEditMode, then for the editList
+  // being populated as a result of that changing
+}, { flush: "post", immediate: true });
 
 function toggleEditMode() {
   isEditMode.value = !isEditMode.value;
@@ -53,8 +80,8 @@ function toggleEditMode() {
         <!-- Edit mode: single merged list -->
         <template v-if="isEditMode">
           <section aria-label="Edit list items">
-            <ul class="item-list">
-              <li v-for="item in list.items" :key="item.id">
+            <ul ref="editList" class="item-list">
+              <li v-for="item in sortedItems" :key="item.id" :data-item-id="item.id">
                 <ShoplistItemRow
                   :item="item"
                   :is-edit-mode="true"
@@ -62,13 +89,11 @@ function toggleEditMode() {
                   @delete="deleteItem(item.id)"
                 />
               </li>
-              <li>
-                <ShoplistItemRow
-                  :is-edit-mode="true"
-                  @add="addItem"
-                />
-              </li>
             </ul>
+            <ShoplistItemRow
+              :is-edit-mode="true"
+              @add="addItem"
+            />
           </section>
         </template>
 
