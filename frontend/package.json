@@ -22,7 +22,7 @@
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^7.7.3",
+    "@antfu/eslint-config": "^8.0.0",
     "@nuxt/eslint": "^1.15.2",
     "@primevue/nuxt-module": "^4.5.4",
     "eslint-plugin-format": "^2.0.1"
