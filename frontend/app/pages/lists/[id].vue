@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRouteQuery } from "@vueuse/router";
 import { useDraggable } from "vue-draggable-plus";
 
 const route = useRoute();
@@ -16,7 +17,13 @@ const {
   reorderItem,
 } = useShoplist(listId);
 
-const isEditMode = ref(false);
+const isEditMode = useRouteQuery<boolean>("edit", String(false), {
+  transform: {
+    get: v => v === String(true),
+    set: v => String(v),
+  },
+  mode: "replace",
+});
 const editList = ref<HTMLElement | null>(null);
 const { start, destroy } = useDraggable(editList, {
   immediate: false,
