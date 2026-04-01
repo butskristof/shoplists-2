@@ -81,12 +81,9 @@ function confirmDelete(event: Event) {
     <div
       class="item-row" :class="{ 'item-row--editing': isEditing || isAddRow }"
     >
-      <Checkbox
-        :model-value="item?.done ?? false"
-        disabled
-        binary
-        size="large"
-      />
+      <span class="drag-handle" aria-hidden="true">
+        <i v-if="!isAddRow" class="pi pi-ellipsis-v" />
+      </span>
       <template v-if="isEditing || isAddRow">
         <InputText
           ref="inputRef"
@@ -175,6 +172,21 @@ function confirmDelete(event: Event) {
   gap: var(--spacing-md);
   padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid var(--p-surface-200);
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: grab;
+  color: var(--p-surface-500);
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .item-row--normal-mode {

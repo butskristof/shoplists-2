@@ -106,6 +106,7 @@ export function useShoplist(listId: string) {
     list,
     isLoading,
     error,
+    sortedItems,
     itemsToGet,
     doneItems,
     toggleItem,
