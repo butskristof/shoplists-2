@@ -52,7 +52,8 @@ See `README.md` for feature ideas.
 - **Testing**: Unit and integration tests, strict coverage expected. Framework TBD (likely TUnit).
   Exact setup to be decided in a dedicated session.
 - **Solution structure**: TBD — exact projects, layering, and library choices to be defined later.
-  The `backend/` folder will contain a `.slnx` solution file and the Aspire AppHost at minimum.
+  The `backend/` folder contains a `.slnx` solution file, the Aspire AppHost, and a ServiceDefaults
+  project (shared Aspire configuration). API/domain projects will be added later.
 
 ### Infrastructure & Local Development
 - **Orchestration**: Aspire (AppHost) manages the full local stack — backend services, frontend
@@ -91,11 +92,12 @@ The following MCP servers are configured in `.mcp.json` and available to agents:
 ```
 repo root/
   backend/
-    Shoplists.slnx          -> .NET solution root
-    Shoplists.AppHost/       -> Aspire AppHost (orchestrates entire stack)
-    ...                      -> Future API/domain projects
+    Shoplists.slnx           -> .NET solution root
+    AppHost/                  -> Aspire AppHost (orchestrates entire stack)
+    ServiceDefaults/          -> Shared Aspire service configuration (OpenTelemetry, health checks, resilience)
+    ...                       -> Future API/domain projects
   frontend/
-    ...                      -> Nuxt application
+    ...                       -> Nuxt application
 ```
 
 ---
@@ -133,8 +135,9 @@ Before considering any task complete:
 5. **Playwright verification** — for UI changes, use the Playwright MCP to visually and functionally
    verify the result
 
-Code style is enforced by tooling (`.editorconfig`, CSharpier, ESLint/Prettier for frontend — exact
-config TBD). Follow whatever these tools dictate. Do not override or bypass them.
+Code style is enforced by tooling (`.editorconfig` in frontend, ESLint with @antfu/eslint-config for
+frontend — backend formatter TBD, likely CSharpier). Follow whatever these tools dictate. Do not
+override or bypass them.
 
 ### API Contract Sync
 
@@ -146,6 +149,18 @@ client should be generated from these specs so types stay in sync. Exact tooling
 - **Mobile-first**: Design and implement for mobile viewports first.
 - **Desktop enhancement**: Gracefully enhance for larger screens — do not just stretch the mobile layout.
 - Both mobile and desktop are primary use cases.
+
+### Running the Application
+
+The user typically has Aspire running in Rider already. When you need to access the running frontend
+(e.g., for Playwright verification):
+
+1. **First**: Use the Aspire MCP to discover the frontend URL from the running Aspire instance.
+2. **If no Aspire instance is running**: Start it with `aspire run` from the repo root.
+3. **Last resort only**: Fall back to `npm run dev` in the frontend directory — this should be rare,
+   as Aspire is the standard way to run the full stack.
+
+Never start `npm run dev` as a first instinct — always check Aspire first.
 
 ### Agent Conduct
 
@@ -173,5 +188,5 @@ this file updated accordingly.
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
 | API client generation | Nuxt Open Fetch or alternative | Not started |
 | API documentation UI | Likely Scalar | Not started |
-| Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config (ESLint Stylistic, no Prettier). Backend: CSharpier (TBD). .editorconfig in place. | **Decided (frontend)** |
+| Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config (ESLint Stylistic, no Prettier), .editorconfig in frontend. Backend: likely CSharpier + .editorconfig (TBD). | **Decided (frontend)** |
 | CI/CD pipeline | GitHub Actions configuration | Not started |
