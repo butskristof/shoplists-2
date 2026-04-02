@@ -128,7 +128,7 @@ function toggleEditMode() {
         </template>
 
         <!-- Normal mode: shopping view -->
-        <template v-else>
+        <template v-else-if="list.items.length > 0">
           <section class="todo-section" aria-label="Items to get">
             <h2 class="todo-heading">
               Items to get
@@ -170,6 +170,18 @@ function toggleEditMode() {
             </ul>
           </section>
         </template>
+
+        <div v-else class="empty-state">
+          <i class="pi pi-check-circle icon" />
+          <p>Ready to go! Add some items to your list to get started.</p>
+          <Button
+            label="Add items"
+            icon="pi pi-pencil"
+            variant="outlined"
+            size="small"
+            @click="toggleEditMode"
+          />
+        </div>
       </div>
     </template>
 
