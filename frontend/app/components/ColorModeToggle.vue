@@ -25,7 +25,7 @@ const colorModeLabel = computed(() => {
 function cycleColorMode() {
   const modes = ["system", "light", "dark"] as const;
   const currentIndex = modes.indexOf(colorMode.preference as typeof modes[number]);
-  colorMode.preference = modes[(currentIndex + 1) % modes.length];
+  colorMode.preference = modes[(currentIndex + 1) % modes.length]!;
 }
 </script>
 
