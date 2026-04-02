@@ -5,7 +5,13 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-03-25",
   devtools: { enabled: true },
 
-  modules: ["@primevue/nuxt-module", "@nuxt/fonts", "@nuxt/eslint", "@nuxtjs/color-mode"],
+  modules: [
+    "@primevue/nuxt-module",
+    "@nuxt/fonts",
+    "@nuxt/eslint",
+    "@nuxtjs/color-mode",
+    "nuxt-oidc-auth",
+  ],
 
   css: [
     "primeicons/primeicons.css",
@@ -50,6 +56,25 @@ export default defineNuxtConfig({
   eslint: {
     config: {
       standalone: false,
+    },
+  },
+
+  nitro: {
+    storage: {
+      oidc: {
+        driver: "redis",
+        base: "oidc",
+        host: "",
+        port: 0,
+        password: "",
+      },
+    },
+  },
+
+  oidc: {
+    provideDefaultSecrets: false,
+    middleware: {
+      globalMiddlewareEnabled: false,
     },
   },
 });
