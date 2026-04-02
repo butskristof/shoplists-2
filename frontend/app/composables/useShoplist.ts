@@ -56,7 +56,17 @@ export function useShoplists() {
     })),
   );
 
-  return { lists };
+  async function createList(name: string) {
+    const id = crypto.randomUUID();
+    MOCK_DATA[id] = {
+      id,
+      name,
+      items: [],
+    };
+    return id;
+  }
+
+  return { lists, createList };
 }
 
 export function useShoplist(listId: string) {
@@ -76,68 +86,115 @@ export function useShoplist(listId: string) {
     sortedItems.value.filter(item => item.done),
   );
 
-  async function toggleItem(itemId: string) {
+  async function toggleItem(itemId: string): Promise<boolean> {
     if (!list.value)
-      return;
-    const item = findItem(list.value.items, itemId);
-    if (item)
-      item.done = !item.done;
-  }
-
-  async function addItem(name: string) {
-    if (!list.value)
-      return;
-    const maxPosition = list.value.items.length > 0
-      ? Math.max(...list.value.items.map(i => i.position))
-      : 0;
-    list.value.items.push({
-      id: crypto.randomUUID(),
-      name,
-      done: false,
-      position: maxPosition + 1,
-    });
-  }
-
-  async function deleteItem(itemId: string) {
-    if (!list.value)
-      return;
-    list.value.items = list.value.items.filter(i => i.id !== itemId);
-  }
-
-  async function updateItemName(itemId: string, newName: string) {
-    if (!list.value)
-      return;
-    const item = findItem(list.value.items, itemId);
-    if (item)
-      item.name = newName;
-  }
-
-  async function reorderItem(itemId: string, newPosition: number) {
-    if (!list.value)
-      return;
+      return false;
     const item = findItem(list.value.items, itemId);
     if (!item)
-      return;
+      return false;
+    try {
+      item.done = !item.done;
+      // Future: API call here — revert item.done on failure
+      return true;
+    }
+    catch {
+      // item.done = !item.done; // revert optimistic update
+      return false;
+    }
+  }
+
+  async function addItem(name: string): Promise<boolean> {
+    if (!list.value)
+      return false;
+    try {
+      const maxPosition = list.value.items.length > 0
+        ? Math.max(...list.value.items.map(i => i.position))
+        : 0;
+      list.value.items.push({
+        id: crypto.randomUUID(),
+        name,
+        done: false,
+        position: maxPosition + 1,
+      });
+      // Future: API call here — remove item on failure
+      return true;
+    }
+    catch {
+      return false;
+    }
+  }
+
+  async function deleteItem(itemId: string): Promise<boolean> {
+    if (!list.value)
+      return false;
+    const previousItems = [...list.value.items];
+    try {
+      list.value.items = list.value.items.filter(i => i.id !== itemId);
+      // Future: API call here — restore previousItems on failure
+      return true;
+    }
+    catch {
+      list.value.items = previousItems; // revert optimistic update
+      return false;
+    }
+  }
+
+  async function updateItemName(itemId: string, newName: string): Promise<boolean> {
+    if (!list.value)
+      return false;
+    const item = findItem(list.value.items, itemId);
+    if (!item)
+      return false;
+    const previousName = item.name;
+    try {
+      item.name = newName;
+      // Future: API call here — revert to previousName on failure
+      return true;
+    }
+    catch {
+      item.name = previousName; // revert optimistic update
+      return false;
+    }
+  }
+
+  async function reorderItem(itemId: string, newPosition: number): Promise<boolean> {
+    if (!list.value)
+      return false;
+    const item = findItem(list.value.items, itemId);
+    if (!item)
+      return false;
 
     const oldPosition = item.position;
     if (oldPosition === newPosition)
-      return;
+      return true;
 
-    for (const other of list.value.items) {
-      if (other.id === itemId)
-        continue;
-      if (oldPosition < newPosition) {
-        // Moving down: shift items in between up
-        if (other.position > oldPosition && other.position <= newPosition)
-          other.position--;
+    const previousPositions = list.value.items.map(i => ({ id: i.id, position: i.position }));
+    try {
+      for (const other of list.value.items) {
+        if (other.id === itemId)
+          continue;
+        if (oldPosition < newPosition) {
+          if (other.position > oldPosition && other.position <= newPosition)
+            other.position--;
+        }
+        else {
+          if (other.position >= newPosition && other.position < oldPosition)
+            other.position++;
+        }
       }
-      else {
-        // Moving up: shift items in between down
-        if (other.position >= newPosition && other.position < oldPosition)
-          other.position++;
-      }
+      item.position = newPosition;
+      // Future: API call here — restore previousPositions on failure
+      return true;
     }
-    item.position = newPosition;
+    catch {
+      // revert all positions
+      for (const prev of previousPositions) {
+        const i = findItem(list.value.items, prev.id);
+        if (i)
+          i.position = prev.position;
+      }
+      return false;
+    }
   }
 
   return {

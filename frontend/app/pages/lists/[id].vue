@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useRouteQuery } from "@vueuse/router";
+import { useToast } from "primevue/usetoast";
 import { useDraggable } from "vue-draggable-plus";
 
 const route = useRoute();
 const listId = route.params.id as string;
+const toast = useToast();
 
 const {
   list,
@@ -17,7 +19,29 @@ const {
   reorderItem,
 } = useShoplist(listId);
 
-const isEditMode = useRouteQuery<boolean>("edit", String(false), {
+useHead({
+  title: computed(() => list.value?.name),
+});
+
+async function handleToggle(itemId: string) {
+  await toggleItem(itemId);
+}
+
+async function handleAdd(name: string) {
+  await addItem(name);
+}
+
+async function handleDelete(itemId: string) {
+  const success = await deleteItem(itemId);
+  if (success)
+    toast.add({ severity: "info", summary: "Item removed", life: 2000 });
+}
+
+async function handleUpdateName(itemId: string, name: string) {
+  await updateItemName(itemId, name);
+}
+
+const isEditMode = useRouteQuery("edit", String(false), {
   transform: {
     get: v => v === String(true),
     set: v => String(v),
@@ -77,7 +101,6 @@ function toggleEditMode() {
             :icon="isEditMode ? 'pi pi-times' : 'pi pi-pencil'"
             :aria-label="isEditMode ? 'Exit edit mode' : 'Edit list'"
             :label="isEditMode ? 'Exit edit mode' : 'Edit list'"
-            variant="outlined"
             @click="toggleEditMode"
           />
         </div>
@@ -92,14 +115,14 @@ function toggleEditMode() {
                 <ShoplistItemRow
                   :item="item"
                   :is-edit-mode="true"
-                  @update:name="updateItemName(item.id, $event)"
-                  @delete="deleteItem(item.id)"
+                  @update:name="handleUpdateName(item.id, $event)"
+                  @delete="handleDelete(item.id)"
                 />
               </li>
             </ul>
             <ShoplistItemRow
               :is-edit-mode="true"
-              @add="addItem"
+              @add="handleAdd"
             />
           </section>
         </template>
@@ -115,12 +138,20 @@ function toggleEditMode() {
                 <ShoplistItemRow
                   :item="item"
                   :is-edit-mode="false"
-                  @toggle="toggleItem(item.id)"
+                  @toggle="handleToggle(item.id)"
                 />
               </li>
             </ul>
             <div v-else class="empty-state">
+              <i class="pi pi-check-circle icon" />
               <p>All done! Nothing left to get.</p>
+              <Button
+                label="Add more items"
+                icon="pi pi-pencil"
+                variant="outlined"
+                size="small"
+                @click="toggleEditMode"
+              />
             </div>
           </section>
 
@@ -133,7 +164,7 @@ function toggleEditMode() {
                 <ShoplistItemRow
                   :item="item"
                   :is-edit-mode="false"
-                  @toggle="toggleItem(item.id)"
+                  @toggle="handleToggle(item.id)"
                 />
               </li>
             </ul>
@@ -150,9 +181,17 @@ function toggleEditMode() {
 
 <style scoped>
 .list-detail {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--default-spacing);
+
+  @media (min-width: 640px) {
+    max-width: 600px;
+  }
+  @media (min-width: 768px) {
+    max-width: 720px;
+  }
 }
 
 .list-header {
@@ -161,8 +200,14 @@ function toggleEditMode() {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--default-spacing);
+  min-width: 0;
 
   margin-bottom: var(--default-spacing);
+}
+
+.list-name {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .lists {
@@ -181,7 +226,7 @@ function toggleEditMode() {
   font-size: var(--font-size-base);
   line-height: var(--font-size-base--line-height);
   font-weight: var(--weight-semibold);
-  color: var(--p-surface-500);
+  color: var(--p-text-muted-color);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: var(--spacing-sm);
@@ -199,6 +244,11 @@ function toggleEditMode() {
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-lg) var(--spacing-md);
-  color: var(--p-surface-500);
+  text-align: center;
+
+  .icon {
+    font-size: var(--font-size-4xl);
+    line-height: var(--font-size-4xl--line-height);
+  }
 }
 </style>

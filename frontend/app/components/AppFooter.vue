@@ -13,10 +13,6 @@
 </template>
 
 <style scoped>
-.app-footer {
-  margin-top: var(--spacing-lg);
-}
-
 .footer-content {
   padding: var(--default-spacing);
   @media (min-width: 768px) {
