@@ -4,7 +4,7 @@
 <template>
   <div class="app-header">
     <div class="app-container header-content">
-      <div class="logo">
+      <NuxtLink to="/" class="logo" aria-label="Shoplists home">
         <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path
             fill-rule="evenodd"
@@ -16,7 +16,7 @@
         <div class="name">
           Shoplists
         </div>
-      </div>
+      </NuxtLink>
     </div>
   </div>
 </template>
@@ -33,9 +33,8 @@
 
 .header-content {
   padding: var(--default-spacing);
-  @media (min-width: 768px) {
-    padding-block: var(--spacing-md);
-    padding-inline: var(--spacing-lg);
+  @media (min-width: 640px) {
+    padding-inline: 0;
   }
 
   display: flex;
@@ -53,6 +52,7 @@
 
   font-size: var(--font-size-2xl);
   line-height: var(--font-size-2xl--line-height);
+  text-decoration: none;
 
   .svg-path {
     fill: var(--p-text-color);

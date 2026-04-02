@@ -1,4 +1,6 @@
 <script setup lang="ts">
+useHead({ title: "Your lists" });
+
 const { lists } = useShoplists();
 </script>
 
@@ -12,29 +14,45 @@ const { lists } = useShoplists();
           :to="{ name: 'lists-id', params: { id: item.id } }"
           class="list-row"
         >
-          <div class="list-row__content">
-            <span class="list-row__name">{{ item.name }}</span>
-            <span class="list-row__meta">
+          <div class="content">
+            <span class="name">{{ item.name }}</span>
+            <span class="meta">
               <template v-if="item.itemCount === 0">No items</template>
               <template v-else>{{ item.doneCount }}/{{ item.itemCount }} done</template>
             </span>
           </div>
-          <i class="pi pi-chevron-right list-row__chevron" />
+          <i class="pi pi-chevron-right chevron" />
         </NuxtLink>
       </li>
     </ul>
 
     <div v-else class="empty-state">
-      <p>No lists yet.</p>
+      <i class="pi pi-list icon" />
+      <p>No lists yet</p>
+      <p class="hint">
+        Create a list to start tracking what you need.
+      </p>
+      <Button
+        label="Create list"
+        icon="pi pi-plus"
+      />
     </div>
   </div>
 </template>
 
 <style scoped>
 .list-overview {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--default-spacing);
+
+  @media (min-width: 640px) {
+    max-width: 600px;
+  }
+  @media (min-width: 768px) {
+    max-width: 720px;
+  }
 }
 
 .list {
@@ -50,35 +68,35 @@ const { lists } = useShoplists();
   border-bottom: 1px solid var(--p-content-border-color);
   text-decoration: none;
   color: inherit;
-}
 
-.list-row__content {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  min-width: 0;
-}
+  .content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    min-width: 0;
 
-.list-row__name {
-  font-weight: var(--weight-medium);
-  font-size: var(--font-size-lg);
-  line-height: var(--font-size-lg--line-height);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+    .name {
+      font-weight: var(--weight-medium);
+      font-size: var(--font-size-lg);
+      line-height: var(--font-size-lg--line-height);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
-.list-row__meta {
-  font-size: var(--font-size-sm);
-  line-height: var(--font-size-sm--line-height);
-  color: var(--p-surface-500);
-}
+    .meta {
+      font-size: var(--font-size-sm);
+      line-height: var(--font-size-sm--line-height);
+      color: var(--p-text-muted-color);
+    }
+  }
 
-.list-row__chevron {
-  margin-left: auto;
-  color: var(--p-surface-400);
-  flex-shrink: 0;
-  font-size: var(--font-size-sm);
+  .chevron {
+    margin-left: auto;
+    color: var(--p-surface-400);
+    flex-shrink: 0;
+    font-size: var(--font-size-sm);
+  }
 }
 
 .empty-state {
@@ -87,16 +105,23 @@ const { lists } = useShoplists();
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-lg) var(--spacing-md);
-  color: var(--p-surface-500);
+  text-align: center;
+
+  .icon {
+    font-size: var(--font-size-4xl);
+    line-height: var(--font-size-4xl--line-height);
+  }
+
+  .hint {
+    font-size: var(--font-size-sm);
+    line-height: var(--font-size-sm--line-height);
+    margin-bottom: var(--default-spacing);
+  }
 }
 
 @media (hover: hover) {
   .list-row:hover {
-    background: var(--p-surface-100);
-
-    .dark-mode & {
-      background-color: var(--p-surface-800);
-    }
+    background: var(--p-content-hover-background);
   }
 }
 </style>
