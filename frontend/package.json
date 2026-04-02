@@ -9,7 +9,8 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint . --fix",
-    "lint:check": "eslint ."
+    "lint:check": "eslint .",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@nuxt/fonts": "^0.14.0",
