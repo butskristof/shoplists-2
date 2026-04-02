@@ -6,6 +6,11 @@ const props = defineProps<{
 }>();
 
 const isNotFoundError = computed(() => props.error.status === 404);
+
+useHead({
+  titleTemplate: title => title ? `${title} — Shoplists` : "Shoplists",
+  title: computed(() => isNotFoundError.value ? "Page not found" : "Something went wrong"),
+});
 </script>
 
 <template>

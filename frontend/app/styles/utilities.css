@@ -27,7 +27,6 @@
   --weight-black: 900;
 
   /* Font sizes */
-  /* based off of 1rem = 14px */
   --font-size-xs: 0.75rem;
   --font-size-xs--line-height: calc(1 / 0.75);
   --font-size-sm: 0.875rem;
