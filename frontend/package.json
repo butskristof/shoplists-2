@@ -17,10 +17,12 @@
     "@nuxtjs/color-mode": "^4.0.0",
     "@primeuix/themes": "^2.0.3",
     "@vueuse/router": "^14.2.1",
+    "ioredis": "^5.10.1",
     "nuxt": "^4.4.2",
+    "nuxt-oidc-auth": "^1.0.0-beta.10",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.4",
-    "vue": "^3.5.31",
+    "vue": "^3.5.32",
     "vue-draggable-plus": "^0.6.1",
     "vue-router": "^5.0.4"
   },
