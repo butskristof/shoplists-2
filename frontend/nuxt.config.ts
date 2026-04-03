@@ -10,6 +10,7 @@ export default defineNuxtConfig({
       host: "",
       port: 0,
       password: "",
+      tls: "false",
     },
   },
 

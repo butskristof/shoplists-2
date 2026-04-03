@@ -1,7 +1,8 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var redis = builder.AddRedis("redis")
-    .WithDataVolume();
+var valkey = builder.AddValkey("valkey")
+    .WithDataVolume()
+    .WithPersistence();
 
 #region Frontend
 
@@ -31,7 +32,7 @@ var frontend = builder
     .AddJavaScriptApp(name: "frontend", appDirectory: "../../frontend")
     .WithHttpEndpoint(env: "NITRO_PORT")
     .WithExternalHttpEndpoints()
-    .WaitFor(redis);
+    .WaitFor(valkey);
 
 frontend
     .WithEnvironment("NUXT_OIDC_SESSION_SECRET", oidcSessionSecret)
@@ -49,9 +50,10 @@ frontend
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_TOKEN_URL", oidcTokenUrl)
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_USER_INFO_URL", oidcUserInfoUrl)
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_LOGOUT_URL", oidcLogoutUrl)
-    .WithEnvironment("NUXT_REDIS_HOST", redis.Resource.Host)
-    .WithEnvironment("NUXT_REDIS_PORT", redis.Resource.Port)
-    .WithEnvironment("NUXT_REDIS_PASSWORD", redis.Resource.PasswordParameter!);
+    .WithEnvironment("NUXT_REDIS_HOST", valkey.Resource.Host)
+    .WithEnvironment("NUXT_REDIS_PORT", valkey.Resource.Port)
+    .WithEnvironment("NUXT_REDIS_PASSWORD", valkey.Resource.PasswordParameter!)
+    .WithEnvironment("NUXT_REDIS_TLS", () => valkey.Resource.PrimaryEndpoint.TlsEnabled ? "true" : "false");
 
 #endregion
 
