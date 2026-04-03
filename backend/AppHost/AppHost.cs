@@ -1,7 +1,23 @@
 #pragma warning disable MA0048 // File name must match type name — top-level statements file
+
+using Shoplists.AppHost.Constants;
+using Shoplists.ServiceDefaults.Constants;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
-var valkey = builder.AddValkey("valkey").WithDataVolume().WithPersistence();
+#region Redis
+
+var valkey = builder.AddValkey(Resources.Valkey).WithDataVolume().WithPersistence();
+
+#endregion
+
+#region API
+
+var api = builder
+    .AddProject<Projects.Api>(Resources.Api)
+    .WithHttpHealthCheck(HealthCheckConstants.Endpoints.Ready);
+
+#endregion
 
 #region Frontend
 
@@ -42,10 +58,11 @@ var oidcLogoutUrl = builder
     .WithDescription("OIDC end session (logout) endpoint URL.");
 
 var frontend = builder
-    .AddJavaScriptApp(name: "frontend", appDirectory: "../../frontend")
+    .AddJavaScriptApp(name: Resources.Frontend, appDirectory: "../../frontend")
     .WithHttpEndpoint(env: "NITRO_PORT")
     .WithExternalHttpEndpoints()
-    .WaitFor(valkey);
+    .WaitFor(valkey)
+    .WaitFor(api);
 
 frontend
     .WithEnvironment("NUXT_OIDC_SESSION_SECRET", oidcSessionSecret)

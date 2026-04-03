@@ -1,0 +1,6 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Shoplists.Domain</AssemblyName>
+    <RootNamespace>Shoplists.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,10 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Shoplists.Persistence</AssemblyName>
+    <RootNamespace>Shoplists.Persistence</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\1-core\Application\Application.csproj" />
+  </ItemGroup>
+</Project>
