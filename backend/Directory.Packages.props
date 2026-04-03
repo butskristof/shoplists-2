@@ -4,6 +4,10 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Analyzers -->
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.44" />
+
+    <!-- Aspire -->
     <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.2.1" />
     <PackageVersion Include="Aspire.Hosting.Valkey" Version="13.2.1" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.4.0" />

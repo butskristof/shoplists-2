@@ -59,7 +59,7 @@ See `README.md` for feature ideas.
   Business rule validation (uniqueness, authorization, state transitions) happens in handlers where
   DB access is available.
 - **Analyzers**: Meziantou.Analyzer (installed via `Directory.Build.props`) — provides compile-time
-  enforcement including primary constructor parameter reassignment prevention (MA0147). Combined with
+  enforcement including primary constructor parameter reassignment prevention (MA0143). Combined with
   `TreatWarningsAsErrors`, analyzer violations fail the build.
 - **Testing**: Unit and integration tests, strict coverage expected. Framework TBD (likely TUnit).
   Exact setup to be decided in a dedicated session.
@@ -226,7 +226,7 @@ public static class CreateList
 ```
 
 **Key conventions:**
-- **Primary constructors** for dependency injection (enforced readonly via Meziantou.Analyzer MA0147)
+- **Primary constructors** for dependency injection (enforced readonly via Meziantou.Analyzer MA0143)
 - **Nullable request properties** with FluentValidation `NotNull` rules — ensures all validation
   errors flow through the same pipeline and produce uniform `ValidationProblemDetails` responses.
   Trade-off: OpenAPI schema generates nullable types, so generated TypeScript clients have nullable
@@ -292,7 +292,7 @@ Before considering any task complete:
 1. **Build** — all projects must compile without errors or warnings
 2. **Tests** — all existing tests must pass
 3. **Lint** — all configured linters must pass
-4. **Format** — all configured formatters must pass (CSharpier for C#, others TBD)
+4. **Format** — all configured formatters must pass
 5. **Playwright verification** — for UI changes, use the Playwright MCP to visually and functionally
    verify the result
 
@@ -303,11 +303,25 @@ npm run lint:check   # ESLint (no auto-fix)
 npm run typecheck    # nuxt typecheck (vue-tsc)
 npm run build        # production build
 ```
+
+**Backend validation commands** — run from the `backend/` directory.
+```
+dotnet build              # compile + Roslyn analyzers + Meziantou.Analyzer (TreatWarningsAsErrors)
+dotnet csharpier check .  # formatting check (CSharpier)
+dotnet format style --verify-no-changes       # .editorconfig code style rules
+dotnet format analyzers --verify-no-changes   # analyzer-driven style rules
+```
+
 These match what CI runs in `.github/workflows/pr-validation.yml`.
 
-Code style is enforced by tooling (`.editorconfig` in frontend, ESLint with @antfu/eslint-config for
-frontend — backend formatter TBD, likely CSharpier). Follow whatever these tools dictate. Do not
-override or bypass them.
+Code style is enforced by tooling:
+- **Frontend**: `.editorconfig` in `frontend/`, ESLint with @antfu/eslint-config (ESLint Stylistic,
+  no Prettier)
+- **Backend**: `.editorconfig` in `backend/`, CSharpier for formatting, Meziantou.Analyzer for code
+  quality, `dotnet format` for code style. CSharpier is installed as a local dotnet tool
+  (`backend/dotnet-tools.json`); .NET 10 auto-restores local tools on first invocation.
+
+Follow whatever these tools dictate. Do not override or bypass them.
 
 ### API Contract Sync
 
@@ -362,5 +376,5 @@ this file updated accordingly.
 | API documentation UI | Likely Scalar | Not started |
 | OpenAPI nullable trade-off | Nullable C# props → nullable TypeScript. Accepted for now; revisit if painful (FluentValidation→OpenAPI schema integration or derived types) | **Accepted (revisit later)** |
 | ErrorOr → HTTP mapping | Exact implementation for mapping ErrorOr types to ProblemDetails at API boundary | Not started |
-| Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config (ESLint Stylistic, no Prettier), .editorconfig in frontend. Backend: likely CSharpier + .editorconfig (TBD). | **Decided (frontend)** |
+| Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config, .editorconfig. Backend: CSharpier + Meziantou.Analyzer + .editorconfig. | **Decided** |
 | CI/CD pipeline | GitHub Actions configuration | Not started |

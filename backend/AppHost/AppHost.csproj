@@ -1,15 +1,13 @@
 <Project Sdk="Aspire.AppHost.Sdk/13.2.1">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>e4f461b9-ca42-4c11-82eb-45daaf25980c</UserSecretsId>
+    <AssemblyName>Shoplists.AppHost</AssemblyName>
+    <RootNamespace>Shoplists.AppHost</RootNamespace>
+  </PropertyGroup>
 
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <UserSecretsId>e4f461b9-ca42-4c11-82eb-45daaf25980c</UserSecretsId>
-        <AssemblyName>Shoplists.AppHost</AssemblyName>
-        <RootNamespace>Shoplists.AppHost</RootNamespace>
-    </PropertyGroup>
-
-    <ItemGroup>
-      <PackageReference Include="Aspire.Hosting.JavaScript" />
-      <PackageReference Include="Aspire.Hosting.Valkey" />
-    </ItemGroup>
-
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.JavaScript" />
+    <PackageReference Include="Aspire.Hosting.Valkey" />
+  </ItemGroup>
 </Project>
