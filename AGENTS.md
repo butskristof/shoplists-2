@@ -46,14 +46,25 @@ See `README.md` for feature ideas.
 - **API documentation**: OpenAPI (UI TBD, likely Scalar)
 - **ORM**: Entity Framework Core
 - **Database**: PostgreSQL
-- **Architecture**: TBD (clean architecture or vertical slices — to be decided in a dedicated session)
-- **Mediator**: TBD (library choice pending due to MediatR license changes)
-- **Error handling**: TBD (likely a result/error response pattern, not exceptions)
+- **Architecture**: Clean architecture with feature-organized application layer (see Backend
+  Architecture & Conventions below)
+- **Mediator**: [Mediator](https://github.com/martinothamar/Mediator) (martinothamar) — MIT-licensed,
+  source-generated, MediatR-compatible API shape. Chosen over MediatR (license concerns), Wolverine
+  (overkill for in-process mediation), and Immediate.Handlers (too immature).
+- **Result/error pattern**: [ErrorOr](https://github.com/amantinband/error-or) — clean ergonomics,
+  entry-point-agnostic error types (NotFound, Validation, Conflict, etc.), no HTTP coupling in the
+  Application layer. Mapping to HTTP status codes / ProblemDetails happens at the API boundary.
+- **Validation**: [FluentValidation](https://docs.fluentvalidation.net/) — used for input/format
+  validation (shape of data: non-null, non-negative, valid format) via a mediator pipeline behavior.
+  Business rule validation (uniqueness, authorization, state transitions) happens in handlers where
+  DB access is available.
+- **Analyzers**: Meziantou.Analyzer (installed via `Directory.Build.props`) — provides compile-time
+  enforcement including primary constructor parameter reassignment prevention (MA0147). Combined with
+  `TreatWarningsAsErrors`, analyzer violations fail the build.
 - **Testing**: Unit and integration tests, strict coverage expected. Framework TBD (likely TUnit).
   Exact setup to be decided in a dedicated session.
-- **Solution structure**: TBD — exact projects, layering, and library choices to be defined later.
-  The `backend/` folder contains a `.slnx` solution file, the Aspire AppHost, and a ServiceDefaults
-  project (shared Aspire configuration). API/domain projects will be added later.
+- **Solution structure**: Clean architecture with numbered folder groupings for dependency direction
+  clarity. See Project Structure below for the full layout.
 
 ### Infrastructure & Local Development
 - **Orchestration**: Aspire (AppHost) manages the full local stack — backend services, frontend
@@ -91,14 +102,162 @@ The following MCP servers are configured in `.mcp.json` and available to agents:
 
 ```
 repo root/
+  Shoplists.slnx                    -> .NET solution (references all backend + Aspire projects)
+  AppHost/                           -> Aspire AppHost (orchestrates full stack: backend, frontend, Postgres)
   backend/
-    Shoplists.slnx           -> .NET solution root
-    AppHost/                  -> Aspire AppHost (orchestrates entire stack)
-    ServiceDefaults/          -> Shared Aspire service configuration (OpenTelemetry, health checks, resilience)
-    ...                       -> Future API/domain projects
+    Directory.Build.props            -> Shared build config (TFM, nullable, analyzers, TreatWarningsAsErrors)
+    ServiceDefaults/                 -> Shared Aspire service configuration (OpenTelemetry, health checks, resilience)
+    src/
+      1. Core/
+        Shoplists.Domain/            -> Entities, value objects, domain logic (no external dependencies)
+        Shoplists.Application/       -> Use cases, mediator handlers, validation, cross-cutting concerns
+      2. Infrastructure/
+        Shoplists.Infrastructure/    -> External service integrations (TimeProvider, API clients, file storage)
+        Shoplists.Persistence/       -> EF Core DbContext, entity configurations, repositories
+      3. Hosts/
+        Shoplists.Api/               -> ASP.NET Core Minimal API host, endpoint mapping, auth middleware
+        Shoplists.DatabaseMigrations/-> EF Core migration runner (Aspire-orchestrated, runs before API starts)
+    tests/
+      Shoplists.Domain.UnitTests/
+      Shoplists.Application.UnitTests/
+      Shoplists.Application.IntegrationTests/
+      Shoplists.Tests.Shared/        -> Shared test infrastructure (builders, fixtures, helpers)
   frontend/
-    ...                       -> Nuxt application
+    ...                              -> Nuxt application
 ```
+
+**Dependency direction** (numbered folders visualize this):
+- **1. Core** depends on nothing (only framework/language features and chosen libraries like Mediator, ErrorOr, FluentValidation)
+- **2. Infrastructure** depends on 1. Core (implements interfaces defined in Application/Domain)
+- **3. Hosts** depends on 1. Core and 2. Infrastructure (wires everything together via DI)
+- AppHost depends on Hosts projects (to orchestrate them) but is not part of the layered architecture
+
+**Aspire placement**: AppHost lives at repo root (not inside `backend/`) because it orchestrates the
+entire stack including frontend and infrastructure services. ServiceDefaults stays in `backend/` as
+it's consumed only by .NET backend projects.
+
+---
+
+## Backend Architecture & Conventions
+
+### Clean Architecture Layers
+
+- **Domain**: Entities, value objects, enums, domain logic. No dependencies on external libraries
+  beyond what's needed for the domain model itself. No infrastructure concerns.
+- **Application**: Use cases organized by feature. Depends on Domain. Defines interfaces for
+  infrastructure concerns (e.g., `IAppDbContext`, `ICurrentUser`). Contains mediator handlers,
+  FluentValidation validators, and pipeline behaviors.
+- **Infrastructure**: Implements interfaces defined in Application for external service integrations
+  (TimeProvider, future API clients, file storage, etc.). Does NOT contain EF Core / database concerns.
+- **Persistence**: EF Core DbContext, entity configurations, repository implementations. Separated from
+  Infrastructure to keep packages organized and to avoid the DatabaseMigrations host carrying unrelated
+  dependencies.
+- **Api**: ASP.NET Core Minimal API host. Maps HTTP endpoints to mediator requests. Handles
+  authentication (JWT validation), authorization, and HTTP-specific concerns (ProblemDetails mapping,
+  OpenAPI documentation). Implements infrastructure interfaces that depend on HTTP context (e.g.,
+  `ICurrentUser` reading from `HttpContext`).
+- **DatabaseMigrations**: Standalone host that runs EF Core migrations. Orchestrated by Aspire
+  (`WaitFor(migrator)`) so the API doesn't start until migrations complete. Also suitable for CD
+  pipelines (run migrator before deploying API). This is the correct pattern — running migrations on
+  API startup is an anti-pattern.
+
+### Application Layer Organization
+
+```
+Application/
+  Common/                          -> Cross-cutting concerns shared by all features
+    Authentication/                -> ICurrentUser (interface; implemented in Api project)
+    Configuration/                 -> Settings DTOs (bound from appsettings.json by host)
+    Persistence/                   -> IAppDbContext (interface; implemented in Persistence project)
+    Pipeline/                      -> Mediator pipeline behaviors (logging, validation)
+    Validation/                    -> FluentValidation base classes, extensions, error codes
+  Features/                        -> Use cases organized by domain concept
+    ShoppingLists/
+      CreateList.cs                -> Static class containing Request, Validator, Handler
+      GetList.cs
+      GetLists.cs
+      ...
+    Items/
+      TickItem.cs
+      ...
+```
+
+### Handler File Convention
+
+Each use case lives in a single file as a static class with nested types. This keeps related code
+together and scopes type names to avoid collisions (e.g., `CreateList.Request` vs `GetList.Request`).
+
+```csharp
+public static class CreateList
+{
+    // Request: sealed record, implements ICommand<ErrorOr<T>> or IQuery<ErrorOr<T>>
+    // Properties are nullable with FluentValidation enforcing non-null — this ensures uniform
+    // ValidationProblemDetails responses and keeps OpenAPI contract control in our hands.
+    public sealed record Request : ICommand<ErrorOr<Guid>>
+    {
+        public string? Name { get; init; }
+    }
+
+    // Validator: internal, inherits BaseValidator<Request>
+    // Only validates input shape (non-null, format, range) — NOT business rules
+    internal sealed class Validator : BaseValidator<Request>
+    {
+        public Validator()
+        {
+            RuleFor(r => r.Name).NotNullOrEmptyWithErrorCode();
+        }
+    }
+
+    // Handler: internal, uses primary constructors for DI
+    // Business logic and data access happen here
+    internal sealed class Handler(
+        ILogger<Handler> logger,
+        IAppDbContext dbContext
+    ) : ICommandHandler<Request, ErrorOr<Guid>>
+    {
+        public async ValueTask<ErrorOr<Guid>> Handle(
+            Request request,
+            CancellationToken cancellationToken)
+        {
+            // Implementation
+        }
+    }
+}
+```
+
+**Key conventions:**
+- **Primary constructors** for dependency injection (enforced readonly via Meziantou.Analyzer MA0147)
+- **Nullable request properties** with FluentValidation `NotNull` rules — ensures all validation
+  errors flow through the same pipeline and produce uniform `ValidationProblemDetails` responses.
+  Trade-off: OpenAPI schema generates nullable types, so generated TypeScript clients have nullable
+  fields. Accepted for now; may integrate FluentValidation rules into OpenAPI schema generation later.
+- **`internal` visibility** for Validator and Handler — only the Request (and Response if applicable)
+  need to be public for the API layer to reference them.
+- **ErrorOr<T>** as the return type for all handlers — provides a consistent application layer
+  contract regardless of entry point (API, background job, message consumer).
+- **Split into folder** only when a handler file grows very large (100+ lines in the handler method).
+  For typical CRUD, single file is preferred.
+
+### Logging Philosophy
+
+- Pipeline behaviors handle cross-cutting logging (handler entry/exit, timing, validation failures).
+- OpenTelemetry + Aspire provide trace and metric data automatically.
+- In handlers, log **state and decisions** (entity IDs, which branch was taken, counts), not actions
+  the code already describes ("Mapped request to entity"). Debug/Trace level is fine for granular
+  operational insight — these are filtered out in production by default and available when
+  investigating issues.
+
+### Error Handling at the API Boundary
+
+- Handlers return `ErrorOr<T>` — the Application layer never throws exceptions for expected failures.
+- The API layer maps `ErrorOr` error types to HTTP responses:
+  - `ErrorType.Validation` → 400 + `ValidationProblemDetails`
+  - `ErrorType.NotFound` → 404 + `ProblemDetails`
+  - `ErrorType.Conflict` → 409 + `ProblemDetails`
+  - `ErrorType.Unauthorized` → 403 + `ProblemDetails`
+  - etc.
+- Unexpected exceptions are caught by global middleware and mapped to 500 + `ProblemDetails`.
+- Exact mapping implementation TBD when the API project is set up.
 
 ---
 
@@ -119,7 +278,9 @@ Technologies requiring doc verification:
 - TUnit (or whichever test framework is chosen) → **context7**
 - Nuxt 4 → **nuxt** MCP
 - PrimeVue v4 (design tokens, component APIs) → **primevue** MCP
-- Any mediator library chosen → **context7**
+- Mediator (martinothamar) → **context7**
+- ErrorOr → **context7**
+- FluentValidation → **context7**
 - EF Core with .NET 10 (verify new APIs/patterns) → **mslearn**
 - Any other library added that is < 1 year old or in preview → **context7**
 
@@ -188,14 +349,18 @@ this file updated accordingly.
 
 | Decision | Notes | Status |
 |---|---|---|
-| Backend architecture pattern | Clean architecture vs vertical slices | Not started |
-| Backend solution structure | Project layout, layering | Not started |
-| Mediator library | MediatR alternatives due to license changes | Not started |
-| Result/error pattern library | For application layer error handling | Not started |
+| Backend architecture pattern | Clean architecture, feature-organized application layer | **Decided** |
+| Backend solution structure | Numbered folder groupings, Aspire at repo root, see Project Structure | **Decided** |
+| Mediator library | Mediator (martinothamar) — source-gen'd, MIT, MediatR-compatible | **Decided** |
+| Result/error pattern library | ErrorOr — clean ergonomics, no HTTP coupling in Application | **Decided** |
+| Validation library | FluentValidation — input shape validation via pipeline behavior | **Decided** |
+| Handler conventions | Static class wrapper, nullable props, primary constructors, internal visibility | **Decided** |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
 | API client generation | Nuxt Open Fetch or alternative | Not started |
 | API documentation UI | Likely Scalar | Not started |
+| OpenAPI nullable trade-off | Nullable C# props → nullable TypeScript. Accepted for now; revisit if painful (FluentValidation→OpenAPI schema integration or derived types) | **Accepted (revisit later)** |
+| ErrorOr → HTTP mapping | Exact implementation for mapping ErrorOr types to ProblemDetails at API boundary | Not started |
 | Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config (ESLint Stylistic, no Prettier), .editorconfig in frontend. Backend: likely CSharpier + .editorconfig (TBD). | **Decided (frontend)** |
 | CI/CD pipeline | GitHub Actions configuration | Not started |
