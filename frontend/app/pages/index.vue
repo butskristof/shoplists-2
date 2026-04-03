@@ -8,6 +8,8 @@ const { lists } = useShoplists();
   <div class="list-overview app-container">
     <h1>Your lists</h1>
 
+    <AuthInfo />
+
     <ul v-if="lists.length > 0" class="list">
       <li v-for="item in lists" :key="item.id">
         <NuxtLink
