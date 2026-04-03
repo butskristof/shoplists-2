@@ -14,13 +14,11 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: [
-    "@primevue/nuxt-module",
-    "@nuxt/fonts",
-    "@nuxt/eslint",
-    "@nuxtjs/color-mode",
-    "nuxt-oidc-auth",
-  ],
+  modules: ["@primevue/nuxt-module", "@nuxt/fonts", "@nuxt/eslint", "@nuxtjs/color-mode", "nuxt-oidc-auth", "nuxt-security"],
+
+  security: {
+    corsHandler: false,
+  },
 
   css: [
     "primeicons/primeicons.css",
