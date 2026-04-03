@@ -135,6 +135,15 @@ Before considering any task complete:
 5. **Playwright verification** — for UI changes, use the Playwright MCP to visually and functionally
    verify the result
 
+**Frontend validation commands** — always use the npm scripts defined in `frontend/package.json`,
+run from the `frontend/` directory. Do NOT call `npx nuxi` or `npx nuxt` directly.
+```
+npm run lint:check   # ESLint (no auto-fix)
+npm run typecheck    # nuxt typecheck (vue-tsc)
+npm run build        # production build
+```
+These match what CI runs in `.github/workflows/pr-validation.yml`.
+
 Code style is enforced by tooling (`.editorconfig` in frontend, ESLint with @antfu/eslint-config for
 frontend — backend formatter TBD, likely CSharpier). Follow whatever these tools dictate. Do not
 override or bypass them.
