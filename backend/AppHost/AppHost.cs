@@ -1,6 +1,5 @@
 #pragma warning disable MA0048 // File name must match type name — top-level statements file
 
-using Shoplists.AppHost.Constants;
 using Shoplists.ServiceDefaults.Constants;
 
 var builder = DistributedApplication.CreateBuilder(args);

@@ -16,6 +16,7 @@
   </Folder>
   <Folder Name="/src/3. Hosts/">
     <Project Path="src/3-hosts/Api/Api.csproj" />
+    <Project Path="src/3-hosts/DatabaseMigrator/DatabaseMigrator.csproj" />
   </Folder>
   <Folder Name="/tests/" />
   <Project Path="AppHost/AppHost.csproj" />
