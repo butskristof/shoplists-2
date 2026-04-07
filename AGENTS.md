@@ -102,19 +102,19 @@ The following MCP servers are configured in `.mcp.json` and available to agents:
 
 ```
 repo root/
-  Shoplists.slnx                    -> .NET solution (references all backend + Aspire projects)
-  AppHost/                           -> Aspire AppHost (orchestrates full stack: backend, frontend, Postgres)
   backend/
+    Shoplists.slnx                   -> .NET solution (references all backend + Aspire projects)
+    AppHost/                         -> Aspire AppHost (orchestrates full stack: backend, frontend, Postgres)
     Directory.Build.props            -> Shared build config (TFM, nullable, analyzers, TreatWarningsAsErrors)
-    ServiceDefaults/                 -> Shared Aspire service configuration (OpenTelemetry, health checks, resilience)
     src/
-      1. Core/
+      1-core/
         Shoplists.Domain/            -> Entities, value objects, domain logic (no external dependencies)
         Shoplists.Application/       -> Use cases, mediator handlers, validation, cross-cutting concerns
-      2. Infrastructure/
+      2-infrastructure/
         Shoplists.Infrastructure/    -> External service integrations (TimeProvider, API clients, file storage)
         Shoplists.Persistence/       -> EF Core DbContext, entity configurations, repositories
-      3. Hosts/
+        ServiceDefaults/             -> Shared Aspire service configuration (OpenTelemetry, health checks, resilience)
+      3-hosts/
         Shoplists.Api/               -> ASP.NET Core Minimal API host, endpoint mapping, auth middleware
         Shoplists.DatabaseMigrator/  -> Worker service that applies EF Core migrations, then exits
     tests/
@@ -132,9 +132,9 @@ repo root/
 - **3. Hosts** depends on 1. Core and 2. Infrastructure (wires everything together via DI)
 - AppHost depends on Hosts projects (to orchestrate them) but is not part of the layered architecture
 
-**Aspire placement**: AppHost lives at repo root (not inside `backend/`) because it orchestrates the
-entire stack including frontend and infrastructure services. ServiceDefaults stays in `backend/` as
-it's consumed only by .NET backend projects.
+**Aspire placement**: AppHost lives at the solution root (`backend/`) because it orchestrates the
+entire stack including frontend and infrastructure services. ServiceDefaults lives under
+`backend/src/2-infrastructure/` as it's consumed only by .NET backend projects.
 
 ---
 
