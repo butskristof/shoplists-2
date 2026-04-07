@@ -10,10 +10,10 @@ builder.AddServiceDefaults();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure();
-builder.AddPersistence(Resources.Postgres);
+builder.AddPersistence(Resources.AppDb);
 
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
 
-app.Run();
+await app.RunAsync();

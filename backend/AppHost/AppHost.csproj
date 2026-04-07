@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.JavaScript" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="Aspire.Hosting.Valkey" />
   </ItemGroup>
 
@@ -17,5 +18,6 @@
       IsAspireProjectResource="false"
     />
     <ProjectReference Include="..\src\3-hosts\Api\Api.csproj" />
+    <ProjectReference Include="..\src\3-hosts\DatabaseMigrator\DatabaseMigrator.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,5 @@
+# Host/application projects run on ASP.NET Core or the generic host, neither of which has a
+# SynchronizationContext. ConfigureAwait(false) is a no-op in these environments — suppress
+# the analyzer to avoid noise. Library projects (Core, Infrastructure) keep it enabled.
+[*.cs]
+dotnet_diagnostic.MA0004.severity = none

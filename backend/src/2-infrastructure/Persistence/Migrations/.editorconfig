@@ -1,0 +1,9 @@
+# EF Core generates migration files that don't conform to project style rules:
+# - Timestamp-prefixed file names (e.g. 20260407_InitialCreate.cs) violate MA0048 (file-name-must-match-type)
+# - Block-scoped namespaces violate IDE0161 (prefer file-scoped namespaces)
+# - Missing trailing commas in anonymous object initializers violate MA0007 (add comma after last value)
+# These are auto-generated files checked into source control — suppress rather than fight the generator.
+[*.cs]
+dotnet_diagnostic.MA0007.severity = none
+dotnet_diagnostic.MA0048.severity = none
+csharp_style_namespace_declarations = block_scoped

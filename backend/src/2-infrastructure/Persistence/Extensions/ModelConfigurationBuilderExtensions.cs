@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Shoplists.Application.Common.Constants;
 using Shoplists.Domain.Models.Shoplists;
 using Shoplists.Domain.Models.Users;
 
@@ -18,7 +19,10 @@ internal static class ModelConfigurationBuilderExtensions
             .Properties<ShoplistItemId>()
             .HaveConversion<ShoplistItemId.EfCoreValueConverter>();
 
-        configurationBuilder.Properties<UserId>().HaveConversion<UserId.EfCoreValueConverter>();
+        configurationBuilder
+            .Properties<UserId>()
+            .HaveConversion<UserId.EfCoreValueConverter>()
+            .HaveMaxLength(ApplicationConstants.DefaultMaxStringLength);
 
         return configurationBuilder;
     }

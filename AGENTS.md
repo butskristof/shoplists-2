@@ -116,7 +116,7 @@ repo root/
         Shoplists.Persistence/       -> EF Core DbContext, entity configurations, repositories
       3. Hosts/
         Shoplists.Api/               -> ASP.NET Core Minimal API host, endpoint mapping, auth middleware
-        Shoplists.DatabaseMigrations/-> EF Core migration runner (Aspire-orchestrated, runs before API starts)
+        Shoplists.DatabaseMigrator/  -> Worker service that applies EF Core migrations, then exits
     tests/
       Shoplists.Domain.UnitTests/
       Shoplists.Application.UnitTests/
@@ -149,17 +149,21 @@ it's consumed only by .NET backend projects.
   FluentValidation validators, and pipeline behaviors.
 - **Infrastructure**: Implements interfaces defined in Application for external service integrations
   (TimeProvider, future API clients, file storage, etc.). Does NOT contain EF Core / database concerns.
-- **Persistence**: EF Core DbContext, entity configurations, repository implementations. Separated from
-  Infrastructure to keep packages organized and to avoid the DatabaseMigrations host carrying unrelated
-  dependencies.
+- **Persistence**: EF Core DbContext, entity configurations, migration files, and the
+  `DatabaseMigrationRunner` entry point. `AppDbContext` is `internal` — external code accesses
+  migration functionality through `DatabaseMigrationRunner`. Also contains
+  `DesignTimeDbContextFactory` for `dotnet ef` CLI tooling. Separated from Infrastructure to keep
+  packages organized and to avoid the DatabaseMigrator host carrying unrelated dependencies.
 - **Api**: ASP.NET Core Minimal API host. Maps HTTP endpoints to mediator requests. Handles
   authentication (JWT validation), authorization, and HTTP-specific concerns (ProblemDetails mapping,
   OpenAPI documentation). Implements infrastructure interfaces that depend on HTTP context (e.g.,
   `ICurrentUser` reading from `HttpContext`).
-- **DatabaseMigrations**: Standalone host that runs EF Core migrations. Orchestrated by Aspire
-  (`WaitFor(migrator)`) so the API doesn't start until migrations complete. Also suitable for CD
-  pipelines (run migrator before deploying API). This is the correct pattern — running migrations on
-  API startup is an anti-pattern.
+- **DatabaseMigrator**: Worker Service host that applies EF Core migrations, then exits. Orchestrated
+  by Aspire: starts after Postgres is healthy (`WaitFor`), and the API blocks on its completion
+  (`WaitForCompletion`). If it fails, the API never starts — the failure is visible in the Aspire
+  dashboard. The host is a thin shell; actual migration logic lives in `DatabaseMigrationRunner` in
+  Persistence (keeping `AppDbContext` internal). Also suitable for CD pipelines (run migrator
+  container before deploying API). Running migrations on API startup is an anti-pattern.
 
 ### Application Layer Organization
 
@@ -365,6 +369,54 @@ from the configuration code alone.
   `OwnerId` for "all lists by user"). EF Core auto-creates indexes for FK columns in configured
   relationships.
 
+### Database Migrations
+
+**Architecture**: Migrations are applied by a dedicated Worker Service (`DatabaseMigrator`) that runs
+as part of Aspire orchestration. This avoids the anti-pattern of running migrations on API startup,
+which causes race conditions with multiple API instances, mixes deployment concerns with runtime
+concerns, and requires elevated DB permissions at runtime.
+
+**Aspire orchestration flow**:
+1. Postgres container starts and becomes healthy
+2. DatabaseMigrator starts (`WaitFor(postgres)`)
+3. Migrator applies pending migrations via `MigrateAsync()`, then exits (code 0)
+4. API starts (`WaitForCompletion(migrator)`)
+
+If the migrator fails (non-zero exit), the API never starts. The failure is immediately visible in
+the Aspire dashboard with full logs and traces.
+
+**Postgres container lifecycle**: The Postgres container uses a data volume (`WithDataVolume()`) that
+persists database files across container recreations. When the AppHost restarts, a new container is
+created but mounts the same volume — all data is preserved. The migrator checks
+`__EFMigrationsHistory` and exits as a no-op if everything is already applied. No
+`WithLifetime(ContainerLifetime.Persistent)` is used — the container stops with the AppHost.
+
+**EF Core 9+ `MigrateAsync()` behavior**: Since EF Core 9, `MigrateAsync()` is fully self-contained:
+- Creates the database if it does not exist
+- Acquires a distributed lock to prevent concurrent migrations
+- Manages transactions and execution strategy internally
+- Applies only pending migrations (checks `__EFMigrationsHistory`)
+- No-ops if the database is already up to date
+
+Do NOT wrap `MigrateAsync()` in `CreateExecutionStrategy().ExecuteAsync()` or an explicit
+transaction — EF Core 9+ handles both internally and throws if you add an outer transaction.
+Do NOT call `EnsureCreatedAsync()` before `MigrateAsync()` — it bypasses migrations and creates the
+schema directly, causing `MigrateAsync()` to fail.
+
+**Generating migrations** — run from the Persistence project directory:
+```
+cd backend/src/2-infrastructure/Persistence
+dotnet ef migrations add <MigrationName>
+```
+No `--startup-project` flag is needed. The `DesignTimeDbContextFactory` in Persistence provides a
+dummy connection string that satisfies the Npgsql provider at design time — `dotnet ef` never
+connects to a real database when scaffolding migrations. It diffs the current C# model against the
+`ModelSnapshot.cs` file (not the database state).
+
+**Where migrations live**: Migration files are generated in `Persistence/Migrations/`. They are
+checked into source control. The `DatabaseMigrator` host references Persistence and calls
+`DatabaseMigrationRunner.RunMigrationsAsync()` to apply them at runtime.
+
 ---
 
 ## Development Practices
@@ -476,6 +528,7 @@ this file updated accordingly.
 | Validation library | FluentValidation — input shape validation via pipeline behavior | **Decided** |
 | Handler conventions | Static class wrapper, nullable props, primary constructors, internal visibility | **Decided** |
 | Strongly-typed entity IDs | StronglyTypedId source generator, Guid-backed, EF Core converters via `guid-efcore` template | **Decided** |
+| Database migrations | Dedicated DatabaseMigrator worker host, Aspire WaitForCompletion, migrations in Persistence, DesignTimeDbContextFactory for CLI | **Decided** |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |

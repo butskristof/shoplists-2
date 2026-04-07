@@ -1,5 +1,3 @@
-#pragma warning disable MA0048 // File name must match type name — top-level statements file
-
 using Shoplists.ServiceDefaults.Constants;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -10,10 +8,31 @@ var valkey = builder.AddValkey(Resources.Valkey).WithDataVolume().WithPersistenc
 
 #endregion
 
+#region Database
+
+// No WithPersistence() needed — unlike Valkey/Redis, PostgreSQL writes to disk by default (WAL).
+var postgres = builder.AddPostgres(Resources.Postgres).WithDataVolume();
+var appDb = postgres.AddDatabase(Resources.AppDb);
+
+// Dedicated worker that applies EF Core migrations and exits.
+// WaitFor(postgres): don't start until the database container is healthy.
+// The API (and any future services) use WaitForCompletion on this resource,
+// so they won't start until migrations have been applied successfully.
+// If the migrator fails, dependent resources remain blocked — the failure is immediately
+// visible in the Aspire dashboard.
+var databaseMigrator = builder
+    .AddProject<Projects.DatabaseMigrator>(Resources.DatabaseMigrator)
+    .WithReference(appDb)
+    .WaitFor(appDb);
+
+#endregion
+
 #region API
 
 var api = builder
     .AddProject<Projects.Api>(Resources.Api)
+    .WithReference(appDb)
+    .WaitForCompletion(databaseMigrator)
     .WithHttpHealthCheck(HealthCheckConstants.Endpoints.Ready);
 
 #endregion
