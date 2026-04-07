@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Shoplists.Application.Common.Constants;
+using Shoplists.Application.Common.Persistence;
 using Shoplists.Domain.Models.Shoplists;
 using Shoplists.Persistence.Extensions;
 
 namespace Shoplists.Persistence;
 
-internal sealed class AppDbContext : DbContext
+internal sealed class AppDbContext : DbContext, IAppDbContext
 {
     public AppDbContext(DbContextOptions options)
         : base(options) { }

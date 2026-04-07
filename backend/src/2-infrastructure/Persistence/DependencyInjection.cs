@@ -1,4 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Shoplists.Application.Common.Persistence;
 
 namespace Shoplists.Persistence;
 
@@ -10,6 +12,8 @@ public static class DependencyInjection
     )
     {
         builder.AddNpgsqlDbContext<AppDbContext>(connectionName);
+
+        builder.Services.AddScoped<IAppDbContext, AppDbContext>();
 
         return builder;
     }
