@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Shoplists.Application.Common.Constants;
+using Shoplists.Domain.Models.ShoppingLists;
+using Shoplists.Persistence.Extensions;
 
 namespace Shoplists.Persistence;
 
@@ -10,6 +12,7 @@ internal sealed class AppDbContext : DbContext
 
     #region Entities
 
+    public DbSet<ShoppingList> ShoppingLists => Set<ShoppingList>();
 
     #endregion
 
@@ -27,6 +30,9 @@ internal sealed class AppDbContext : DbContext
         configurationBuilder
             .Properties<string>()
             .HaveMaxLength(ApplicationConstants.DefaultMaxStringLength);
+
+        // register strongly-typed ID value converters
+        configurationBuilder.ConfigureStronglyTypedIdConversions();
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

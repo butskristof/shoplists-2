@@ -127,7 +127,7 @@ repo root/
 ```
 
 **Dependency direction** (numbered folders visualize this):
-- **1. Core** depends on nothing (only framework/language features and chosen libraries like Mediator, ErrorOr, FluentValidation)
+- **1. Core** depends on nothing (only framework/language features and chosen libraries like Mediator, ErrorOr, FluentValidation, StronglyTypedId, and EF Core base package for generated value converters)
 - **2. Infrastructure** depends on 1. Core (implements interfaces defined in Application/Domain)
 - **3. Hosts** depends on 1. Core and 2. Infrastructure (wires everything together via DI)
 - AppHost depends on Hosts projects (to orchestrate them) but is not part of the layered architecture
@@ -259,6 +259,61 @@ public static class CreateList
 - Unexpected exceptions are caught by global middleware and mapped to 500 + `ProblemDetails`.
 - Exact mapping implementation TBD when the API project is set up.
 
+### Strongly-Typed Entity IDs
+
+Every entity uses a strongly-typed ID instead of raw `Guid` to prevent accidental argument
+transposition and improve code clarity. IDs are generated using Andrew Lock's
+[StronglyTypedId](https://github.com/andrewlock/StronglyTypedId) source generator (1.0.0-beta08).
+
+**Package setup (Domain project):**
+- `StronglyTypedId` + `StronglyTypedId.Templates` — both with `PrivateAssets="all" ExcludeAssets="runtime"`
+  (compile-time source generator only, no runtime footprint)
+- `Microsoft.EntityFrameworkCore` — needed for the generated `EfCoreValueConverter` nested class.
+  Pragmatic trade-off: Domain depends on the EF Core base package (not a provider) so that source-generated
+  value converters live next to their ID types.
+
+**Assembly-level defaults** (`Domain/StronglyTypedIdDefaults.cs`):
+```csharp
+[assembly: StronglyTypedIdDefaults(Template.Guid, "guid-efcore")]
+```
+All ID types get: `IEquatable<T>`, `IComparable<T>`, `IFormattable`, `IParsable<T>`,
+`System.Text.Json.JsonConverter`, `System.ComponentModel.TypeConverter`, and a nested
+`EfCoreValueConverter` class.
+
+**Defining a new ID type** — ID types get their own file in the same folder as their entity
+(`Domain/Models/<Feature>/<Entity>Id.cs` + `Domain/Models/<Feature>/<Entity>.cs`):
+```csharp
+// ShoppingListId.cs
+[StronglyTypedId]
+public partial struct ShoppingListId;
+
+// ShoppingList.cs
+public class ShoppingList
+{
+    public ShoppingListId Id { get; set; }
+}
+```
+
+**EF Core registration** — explicit per-type in the `ConfigureStronglyTypedIdConversions` extension
+method (`Persistence/Extensions/ModelConfigurationBuilderExtensions.cs`), which is called from
+`AppDbContext.ConfigureConventions`:
+```csharp
+configurationBuilder.Properties<ShoppingListId>()
+    .HaveConversion<ShoppingListId.EfCoreValueConverter>();
+```
+If you forget to register a new ID type, `dotnet ef migrations add` fails with a clear error — you
+cannot silently miss it.
+
+**Entity configuration** — each entity gets an `IEntityTypeConfiguration<T>` class in
+`Persistence/EntityConfigurations/`.
+
+**Checklist for adding a new entity with a strongly-typed ID:**
+1. Define the ID struct and entity class in `Domain/Models/<Feature>/<Entity>.cs`
+2. Register the ID's value converter in `ConfigureStronglyTypedIdConversions` extension method
+3. Add the `DbSet<Entity>` to `AppDbContext`
+4. Create `<Entity>Configuration` in `Persistence/EntityConfigurations/`
+5. Generate and apply the migration
+
 ---
 
 ## Development Practices
@@ -369,6 +424,7 @@ this file updated accordingly.
 | Result/error pattern library | ErrorOr — clean ergonomics, no HTTP coupling in Application | **Decided** |
 | Validation library | FluentValidation — input shape validation via pipeline behavior | **Decided** |
 | Handler conventions | Static class wrapper, nullable props, primary constructors, internal visibility | **Decided** |
+| Strongly-typed entity IDs | StronglyTypedId source generator, Guid-backed, EF Core converters via `guid-efcore` template | **Decided** |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
@@ -376,5 +432,6 @@ this file updated accordingly.
 | API documentation UI | Likely Scalar | Not started |
 | OpenAPI nullable trade-off | Nullable C# props → nullable TypeScript. Accepted for now; revisit if painful (FluentValidation→OpenAPI schema integration or derived types) | **Accepted (revisit later)** |
 | ErrorOr → HTTP mapping | Exact implementation for mapping ErrorOr types to ProblemDetails at API boundary | Not started |
+| OpenAPI strongly-typed ID schemas | Strongly-typed IDs need an OpenAPI schema transformer to appear as `type: string, format: uuid` instead of complex objects. Address when setting up API documentation. | Not started |
 | Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config, .editorconfig. Backend: CSharpier + Meziantou.Analyzer + .editorconfig. | **Decided** |
 | CI/CD pipeline | GitHub Actions configuration | Not started |
