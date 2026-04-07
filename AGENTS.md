@@ -43,7 +43,7 @@ See `README.md` for feature ideas.
 ### Backend
 - **Runtime**: .NET 10
 - **API style**: Minimal APIs
-- **API documentation**: OpenAPI (UI TBD, likely Scalar)
+- **API documentation**: OpenAPI via `Microsoft.AspNetCore.OpenApi` (built-in .NET 10), Scalar for docs UI
 - **ORM**: Entity Framework Core
 - **Database**: PostgreSQL
 - **Architecture**: Clean architecture with feature-organized application layer (see Backend
@@ -261,7 +261,49 @@ public static class CreateList
   - `ErrorType.Unauthorized` → 403 + `ProblemDetails`
   - etc.
 - Unexpected exceptions are caught by global middleware and mapped to 500 + `ProblemDetails`.
-- Exact mapping implementation TBD when the API project is set up.
+- Mapping is implemented via `ToHttpResult()` extension methods in `Api/Extensions/ErrorOrExtensions.cs`:
+  - Extension on `ValueTask<ErrorOr<T>>` enables `await sender.Send(req).ToHttpResult()` (no awkward
+    parenthesizing the await).
+  - Extension on `ErrorOr<T>` for direct use.
+  - Default success mapping: `TypedResults.Ok(value)`. Override via `onSuccess` parameter for 201
+    Created (`value => TypedResults.Created(...)`) or 204 NoContent (`_ => TypedResults.NoContent()`).
+  - Multiple validation errors are grouped by `Error.Code` into `ValidationProblemDetails`.
+  - Non-validation errors use the first error to determine status code.
+
+### Minimal API Endpoint Conventions
+
+Endpoints are organized in `Api/Endpoints/`, one static class per feature. Each class defines an
+extension method on `IEndpointRouteBuilder` that creates a `MapGroup()` with the feature's sub-path
+and tags, then maps individual endpoints within that group.
+
+**Structure:**
+```
+Api/
+  Endpoints/
+    ShoplistEndpoints.cs           -> MapGroup("/shoplists"), maps GET/POST/PUT/DELETE
+    ShoplistItemEndpoints.cs       -> MapGroup("/shoplists/{id}/items"), maps item operations
+  Extensions/
+    EndpointRouteBuilderExtensions.cs -> MapShoplistsApi() — top-level /api prefix group
+    ErrorOrExtensions.cs           -> ToHttpResult() extensions for ErrorOr → IResult mapping
+  OpenApi/
+    StronglyTypedIdSchemaTransformer.cs -> Makes strongly-typed IDs appear as string/uuid in OpenAPI
+```
+
+**Top-level wiring**: `Program.cs` calls `app.MapShoplistsApi()`, which creates a `/api` prefix
+group and delegates to each feature's `Map*Endpoints()` method. The `/api` prefix is applied once
+here; feature mappers only specify their own sub-path (e.g., `/shoplists`).
+
+**Endpoint pattern** — endpoints are thin dispatchers:
+```csharp
+private static Task<IResult> GetShoplists(ISender sender) =>
+    sender.Send(new GetShoplists.Request()).ToHttpResult();
+```
+
+**OpenAPI metadata**: `.WithTags()` on the group, `.WithName()` and `.Produces<T>()` per endpoint.
+Scalar serves the docs UI at `/scalar/v1` (dev-only). The OpenAPI spec is at `/openapi/v1.json`.
+
+**OpenAPI schema transformers**: `StronglyTypedIdSchemaTransformer` rewrites strongly-typed ID
+schemas. When adding a new ID type, also add it to the transformer's type mapping dictionary.
 
 ### Strongly-Typed Entity IDs
 
@@ -533,9 +575,10 @@ this file updated accordingly.
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
 | API client generation | Nuxt Open Fetch or alternative | Not started |
-| API documentation UI | Likely Scalar | Not started |
+| API documentation UI | Scalar (`Scalar.AspNetCore`) at `/scalar/v1`, dev-only. OpenAPI via built-in `Microsoft.AspNetCore.OpenApi` | **Decided** |
 | OpenAPI nullable trade-off | Nullable C# props → nullable TypeScript. Accepted for now; revisit if painful (FluentValidation→OpenAPI schema integration or derived types) | **Accepted (revisit later)** |
-| ErrorOr → HTTP mapping | Exact implementation for mapping ErrorOr types to ProblemDetails at API boundary | Not started |
-| OpenAPI strongly-typed ID schemas | Strongly-typed IDs need an OpenAPI schema transformer to appear as `type: string, format: uuid` instead of complex objects. Address when setting up API documentation. | Not started |
+| ErrorOr → HTTP mapping | `ToHttpResult()` extensions on `ValueTask<ErrorOr<T>>` and `ErrorOr<T>` in `Api/Extensions/ErrorOrExtensions.cs`. Default Ok, overridable via `onSuccess` param. | **Decided** |
+| OpenAPI strongly-typed ID schemas | `StronglyTypedIdSchemaTransformer` in `Api/OpenApi/`. New ID types must be added to the transformer's mapping dictionary. | **Decided** |
+| Minimal API endpoint organization | Manual extension methods per feature in `Api/Endpoints/`, `MapGroup()` for grouping, top-level `/api` prefix via `MapShoplistsApi()`. No Carter. | **Decided** |
 | Code style configuration | Frontend: @nuxt/eslint + @antfu/eslint-config, .editorconfig. Backend: CSharpier + Meziantou.Analyzer + .editorconfig. | **Decided** |
 | CI/CD pipeline | GitHub Actions configuration | Not started |
