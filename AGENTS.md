@@ -172,12 +172,12 @@ Application/
     Pipeline/                      -> Mediator pipeline behaviors (logging, validation)
     Validation/                    -> FluentValidation base classes, extensions, error codes
   Features/                        -> Use cases organized by domain concept
-    ShoppingLists/
-      CreateList.cs                -> Static class containing Request, Validator, Handler
-      GetList.cs
-      GetLists.cs
+    Shoplists/
+      CreateShoplist.cs            -> Static class containing Request, Validator, Handler
+      GetShoplist.cs
+      GetShoplists.cs
       ...
-    Items/
+    ShoplistItems/
       TickItem.cs
       ...
 ```
@@ -283,23 +283,31 @@ All ID types get: `IEquatable<T>`, `IComparable<T>`, `IFormattable`, `IParsable<
 **Defining a new ID type** — ID types get their own file in the same folder as their entity
 (`Domain/Models/<Feature>/<Entity>Id.cs` + `Domain/Models/<Feature>/<Entity>.cs`):
 ```csharp
-// ShoppingListId.cs
+// ShoplistId.cs — Guid-backed (uses assembly defaults)
 [StronglyTypedId]
-public partial struct ShoppingListId;
+public partial struct ShoplistId;
 
-// ShoppingList.cs
-public class ShoppingList
+// Shoplist.cs
+public class Shoplist
 {
-    public ShoppingListId Id { get; set; }
+    public ShoplistId Id { get; set; }
 }
+```
+
+**Non-Guid ID types** — override the assembly defaults by specifying template and EF Core converter
+explicitly. Example: `UserId` is string-backed because OIDC subject claims are opaque strings and
+the app may use system values (`DATABASE_MIGRATION`, `SYSTEM`, etc.):
+```csharp
+[StronglyTypedId(Template.String, "string-efcore")]
+public partial struct UserId;
 ```
 
 **EF Core registration** — explicit per-type in the `ConfigureStronglyTypedIdConversions` extension
 method (`Persistence/Extensions/ModelConfigurationBuilderExtensions.cs`), which is called from
 `AppDbContext.ConfigureConventions`:
 ```csharp
-configurationBuilder.Properties<ShoppingListId>()
-    .HaveConversion<ShoppingListId.EfCoreValueConverter>();
+configurationBuilder.Properties<ShoplistId>()
+    .HaveConversion<ShoplistId.EfCoreValueConverter>();
 ```
 If you forget to register a new ID type, `dotnet ef migrations add` fails with a clear error — you
 cannot silently miss it.
@@ -310,9 +318,52 @@ cannot silently miss it.
 **Checklist for adding a new entity with a strongly-typed ID:**
 1. Define the ID struct and entity class in `Domain/Models/<Feature>/<Entity>.cs`
 2. Register the ID's value converter in `ConfigureStronglyTypedIdConversions` extension method
-3. Add the `DbSet<Entity>` to `AppDbContext`
+3. Add the `DbSet<Entity>` to `AppDbContext` (only for aggregate roots — child entities are accessed
+   through their parent's navigation property)
 4. Create `<Entity>Configuration` in `Persistence/EntityConfigurations/`
 5. Generate and apply the migration
+
+### Domain Entity Conventions
+
+**Naming**: Entity names align with the app's domain language. The app is "Shoplist", so entities
+use `Shoplist`, `ShoplistItem` — not `ShoppingList`. Keep names concise and domain-specific.
+
+**Property accessors**:
+- `{ get; set; }` — default for most properties. Entities are not rich domain objects yet; keep it
+  simple and tighten when business logic demands it.
+- `{ get; init; }` — use for properties that should be immutable after creation (e.g., `OwnerId`
+  on `Shoplist`). EF Core handles `init` fine via backing fields during materialization. Prefer
+  `init` as the default; only "open up" to `set` when mutation is an actual use case.
+- **`required`** — use on all properties that must be explicitly set at construction time. This
+  includes `Name`, foreign keys, and any value where a silent default would be a bug (e.g.,
+  `Position` with 1-based ordering — defaulting to 0 would be wrong). Exclude `Id` (handled by
+  `ValueGeneratedOnAdd`) and properties with legitimate defaults (`IsChecked = false`).
+
+**Collection navigation properties** — use a private backing field with a public read-only accessor:
+```csharp
+private readonly List<ShoplistItem> _items = [];
+public IReadOnlyList<ShoplistItem> Items => _items.AsReadOnly();
+```
+EF Core discovers the `_items` backing field by convention. External code gets read-only access;
+mutations go through the aggregate root. Child entities don't get a `DbSet` — they're accessed only
+through their parent.
+
+### EF Core Entity Configuration Conventions
+
+Entity configurations should be **explicit over implicit** — don't rely on EF Core conventions when
+the intent can be stated directly in the configuration. This makes the database schema inspectable
+from the configuration code alone.
+
+- **`HasKey`** — always explicit, even though EF Core would find `Id` by convention.
+- **`ValueGeneratedOnAdd`** — always explicit on ID properties. Works as a fallback; if the
+  application sets the ID before saving, EF uses that value instead.
+- **`IsRequired`** — always explicit on required string properties, even when the C# type is
+  non-nullable. Reinforces intent at the persistence layer.
+- **Max lengths** — handled globally by `ConfigureConventions` (`DefaultMaxStringLength = 512`).
+  Only configure per-property if a column needs a different limit.
+- **Indexes** — add explicitly for non-FK properties used in common query patterns (e.g.,
+  `OwnerId` for "all lists by user"). EF Core auto-creates indexes for FK columns in configured
+  relationships.
 
 ---
 

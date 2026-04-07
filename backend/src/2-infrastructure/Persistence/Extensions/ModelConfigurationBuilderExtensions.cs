@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using Shoplists.Domain.Models.ShoppingLists;
+using Shoplists.Domain.Models.Shoplists;
+using Shoplists.Domain.Models.Users;
 
 namespace Shoplists.Persistence.Extensions;
 
@@ -10,8 +11,14 @@ internal static class ModelConfigurationBuilderExtensions
     )
     {
         configurationBuilder
-            .Properties<ShoppingListId>()
-            .HaveConversion<ShoppingListId.EfCoreValueConverter>();
+            .Properties<ShoplistId>()
+            .HaveConversion<ShoplistId.EfCoreValueConverter>();
+
+        configurationBuilder
+            .Properties<ShoplistItemId>()
+            .HaveConversion<ShoplistItemId.EfCoreValueConverter>();
+
+        configurationBuilder.Properties<UserId>().HaveConversion<UserId.EfCoreValueConverter>();
 
         return configurationBuilder;
     }

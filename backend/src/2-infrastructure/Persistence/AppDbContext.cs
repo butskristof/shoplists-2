@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Shoplists.Application.Common.Constants;
-using Shoplists.Domain.Models.ShoppingLists;
+using Shoplists.Domain.Models.Shoplists;
 using Shoplists.Persistence.Extensions;
 
 namespace Shoplists.Persistence;
@@ -12,7 +12,7 @@ internal sealed class AppDbContext : DbContext
 
     #region Entities
 
-    public DbSet<ShoppingList> ShoppingLists => Set<ShoppingList>();
+    public DbSet<Shoplist> Shoplists => Set<Shoplist>();
 
     #endregion
 
