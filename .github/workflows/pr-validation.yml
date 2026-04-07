@@ -35,5 +35,9 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           global-json-file: backend/global.json
+      - run: dotnet tool restore
+      - run: dotnet csharpier check .
+      - run: dotnet format style --no-restore --verify-no-changes
+      - run: dotnet format analyzers --no-restore --verify-no-changes
       - run: dotnet restore
       - run: dotnet build --no-restore

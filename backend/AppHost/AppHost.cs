@@ -1,38 +1,86 @@
+using Shoplists.ServiceDefaults.Constants;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
-var valkey = builder.AddValkey("valkey")
-    .WithDataVolume()
-    .WithPersistence();
+#region Redis
+
+var valkey = builder.AddValkey(Resources.Valkey).WithDataVolume().WithPersistence();
+
+#endregion
+
+#region Database
+
+// No WithPersistence() needed — unlike Valkey/Redis, PostgreSQL writes to disk by default (WAL).
+var postgres = builder.AddPostgres(Resources.Postgres).WithDataVolume();
+var appDb = postgres.AddDatabase(Resources.AppDb);
+
+// Dedicated worker that applies EF Core migrations and exits.
+// WaitFor(postgres): don't start until the database container is healthy.
+// The API (and any future services) use WaitForCompletion on this resource,
+// so they won't start until migrations have been applied successfully.
+// If the migrator fails, dependent resources remain blocked — the failure is immediately
+// visible in the Aspire dashboard.
+var databaseMigrator = builder
+    .AddProject<Projects.DatabaseMigrator>(Resources.DatabaseMigrator)
+    .WithReference(appDb)
+    .WaitFor(appDb);
+
+#endregion
+
+#region API
+
+var api = builder
+    .AddProject<Projects.Api>(Resources.Api)
+    .WithReference(appDb)
+    .WaitForCompletion(databaseMigrator)
+    .WithHttpHealthCheck(HealthCheckConstants.Endpoints.Ready);
+
+#endregion
 
 #region Frontend
 
-var oidcSessionSecret = builder.AddParameter("oidc-session-secret", secret: true)
+var oidcSessionSecret = builder
+    .AddParameter("oidc-session-secret", secret: true)
     .WithDescription("Random string (min 48 chars) used to encrypt the user session.");
-var oidcAuthSessionSecret = builder.AddParameter("oidc-auth-session-secret", secret: true)
-    .WithDescription("Random string (min 48 chars) used to encrypt individual OAuth flow sessions.");
-var oidcTokenKey = builder.AddParameter("oidc-token-key", secret: true)
+var oidcAuthSessionSecret = builder
+    .AddParameter("oidc-auth-session-secret", secret: true)
+    .WithDescription(
+        "Random string (min 48 chars) used to encrypt individual OAuth flow sessions."
+    );
+var oidcTokenKey = builder
+    .AddParameter("oidc-token-key", secret: true)
     .WithDescription("Base64-encoded AES-256-GCM key used to encrypt the server-side token store.");
 
-var oidcClientId = builder.AddParameter("oidc-client-id")
+var oidcClientId = builder
+    .AddParameter("oidc-client-id")
     .WithDescription("OIDC client ID registered with the identity provider.");
-var oidcClientSecret = builder.AddParameter("oidc-client-secret", secret: true)
+var oidcClientSecret = builder
+    .AddParameter("oidc-client-secret", secret: true)
     .WithDescription("OIDC client secret provided by identity provider.");
-var oidcOpenIdConfiguration = builder.AddParameter("oidc-openid-configuration")
-    .WithDescription("URL to the OpenID Connect discovery document (e.g. https://idp.example.com/.well-known/openid-configuration).");
-var oidcAuthorizationUrl = builder.AddParameter("oidc-authorization-url")
+var oidcOpenIdConfiguration = builder
+    .AddParameter("oidc-openid-configuration")
+    .WithDescription(
+        "URL to the OpenID Connect discovery document (e.g. https://idp.example.com/.well-known/openid-configuration)."
+    );
+var oidcAuthorizationUrl = builder
+    .AddParameter("oidc-authorization-url")
     .WithDescription("OIDC authorization endpoint URL.");
-var oidcTokenUrl = builder.AddParameter("oidc-token-url")
+var oidcTokenUrl = builder
+    .AddParameter("oidc-token-url")
     .WithDescription("OIDC token endpoint URL.");
-var oidcUserInfoUrl = builder.AddParameter("oidc-userinfo-url")
+var oidcUserInfoUrl = builder
+    .AddParameter("oidc-userinfo-url")
     .WithDescription("OIDC userinfo endpoint URL.");
-var oidcLogoutUrl = builder.AddParameter("oidc-logout-url")
+var oidcLogoutUrl = builder
+    .AddParameter("oidc-logout-url")
     .WithDescription("OIDC end session (logout) endpoint URL.");
 
 var frontend = builder
-    .AddJavaScriptApp(name: "frontend", appDirectory: "../../frontend")
+    .AddJavaScriptApp(name: Resources.Frontend, appDirectory: "../../frontend")
     .WithHttpEndpoint(env: "NITRO_PORT")
     .WithExternalHttpEndpoints()
-    .WaitFor(valkey);
+    .WaitFor(valkey)
+    .WaitFor(api);
 
 frontend
     .WithEnvironment("NUXT_OIDC_SESSION_SECRET", oidcSessionSecret)
@@ -40,11 +88,14 @@ frontend
     .WithEnvironment("NUXT_OIDC_TOKEN_KEY", oidcTokenKey)
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_CLIENT_ID", oidcClientId)
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_CLIENT_SECRET", oidcClientSecret)
-    .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_REDIRECT_URI", () =>
-    {
-        var endpoint = frontend.GetEndpoint("http");
-        return $"{endpoint.Url}/auth/oidc/callback";
-    })
+    .WithEnvironment(
+        "NUXT_OIDC_PROVIDERS_OIDC_REDIRECT_URI",
+        () =>
+        {
+            var endpoint = frontend.GetEndpoint("http");
+            return $"{endpoint.Url}/auth/oidc/callback";
+        }
+    )
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_OPEN_ID_CONFIGURATION", oidcOpenIdConfiguration)
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_AUTHORIZATION_URL", oidcAuthorizationUrl)
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_TOKEN_URL", oidcTokenUrl)
@@ -53,7 +104,10 @@ frontend
     .WithEnvironment("NUXT_REDIS_HOST", valkey.Resource.Host)
     .WithEnvironment("NUXT_REDIS_PORT", valkey.Resource.Port)
     .WithEnvironment("NUXT_REDIS_PASSWORD", valkey.Resource.PasswordParameter!)
-    .WithEnvironment("NUXT_REDIS_TLS", () => valkey.Resource.PrimaryEndpoint.TlsEnabled ? "true" : "false");
+    .WithEnvironment(
+        "NUXT_REDIS_TLS",
+        () => valkey.Resource.PrimaryEndpoint.TlsEnabled ? "true" : "false"
+    );
 
 #endregion
 
