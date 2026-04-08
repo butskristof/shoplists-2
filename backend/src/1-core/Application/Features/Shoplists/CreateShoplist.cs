@@ -10,10 +10,7 @@ namespace Shoplists.Application.Features.Shoplists;
 
 public static class CreateShoplist
 {
-    public sealed record Request : ICommand<ErrorOr<Response>>
-    {
-        public string? Name { get; init; }
-    }
+    public sealed record Request(string? Name) : ICommand<ErrorOr<Response>>;
 
     public sealed record Response(ShoplistId Id);
 
@@ -39,7 +36,7 @@ public static class CreateShoplist
             var shoplist = new Shoplist { Name = request.Name!, OwnerId = currentUser.UserId };
 
             dbContext.Shoplists.Add(shoplist);
-            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogDebug("Created shoplist {ShoplistId}", shoplist.Id);
 

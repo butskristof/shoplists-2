@@ -32,9 +32,7 @@ internal sealed class Worker(
         var sw = Stopwatch.StartNew();
 
         logger.LogInformation("Applying database migrations");
-        await DatabaseMigrationRunner
-            .RunMigrationsAsync(serviceProvider, stoppingToken)
-            .ConfigureAwait(false);
+        await DatabaseMigrationRunner.RunMigrationsAsync(serviceProvider, stoppingToken);
         logger.LogInformation(
             "Database migrations completed in {ElapsedMilliseconds}ms",
             sw.ElapsedMilliseconds

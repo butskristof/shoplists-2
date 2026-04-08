@@ -35,11 +35,8 @@ public static class DatabaseMigrationRunner
         CancellationToken cancellationToken
     )
     {
-        var scope = services.CreateAsyncScope();
-        await using (scope.ConfigureAwait(false))
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await dbContext.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await using var scope = services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await dbContext.Database.MigrateAsync(cancellationToken);
     }
 }

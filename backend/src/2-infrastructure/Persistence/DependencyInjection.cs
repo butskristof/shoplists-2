@@ -13,7 +13,9 @@ public static class DependencyInjection
     {
         builder.AddNpgsqlDbContext<AppDbContext>(connectionName);
 
-        builder.Services.AddScoped<IAppDbContext, AppDbContext>();
+        // don't register as <IAppDbContext, AppDbContext> since it'll create an additional instance
+        // reuse the already-registered one by getting it from the service provider
+        builder.Services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         return builder;
     }

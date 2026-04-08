@@ -16,12 +16,11 @@ internal sealed class ValidationBehavior<TMessage, TResponse>(
     )
     {
         if (!validators.Any())
-            return await next(message, cancellationToken).ConfigureAwait(false);
+            return await next(message, cancellationToken);
 
         var validationResults = await Task.WhenAll(
-                validators.Select(v => v.ValidateAsync(message, cancellationToken))
-            )
-            .ConfigureAwait(false);
+            validators.Select(v => v.ValidateAsync(message, cancellationToken))
+        );
 
         var errors = validationResults
             .SelectMany(r => r.Errors)
@@ -30,12 +29,13 @@ internal sealed class ValidationBehavior<TMessage, TResponse>(
             .ToList();
 
         if (errors.Count == 0)
-            return await next(message, cancellationToken).ConfigureAwait(false);
+            return await next(message, cancellationToken);
 
-        // ErrorOr<T> has an implicit conversion from List<Error>.
-        // We need to get the inner T from ErrorOr<TResponse> to construct the error result.
-        // Since all our handlers return ErrorOr<T>, TResponse is ErrorOr<T>.
-        // ErrorOr<T> supports implicit conversion from List<Error>.
+        // All handlers return ErrorOr<T>, which has an implicit conversion from List<Error>.
+        // The Mediator source generator fills TResponse as the full ErrorOr<T> type, preventing
+        // a partially-closed generic constraint (it would double-wrap as ErrorOr<ErrorOr<T>>).
+        // Dynamic dispatch is used here to invoke the implicit conversion at runtime.
+        // This is a known pragmatic trade-off — the conversion is a stable part of ErrorOr's API.
         return (dynamic)errors;
     }
 }

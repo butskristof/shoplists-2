@@ -194,13 +194,11 @@ together and scopes type names to avoid collisions (e.g., `CreateList.Request` v
 ```csharp
 public static class CreateList
 {
-    // Request: sealed record, implements ICommand<ErrorOr<T>> or IQuery<ErrorOr<T>>
+    // Request: sealed record with positional (primary constructor) syntax.
+    // Implements ICommand<ErrorOr<T>> or IQuery<ErrorOr<T>>.
     // Properties are nullable with FluentValidation enforcing non-null — this ensures uniform
     // ValidationProblemDetails responses and keeps OpenAPI contract control in our hands.
-    public sealed record Request : ICommand<ErrorOr<Guid>>
-    {
-        public string? Name { get; init; }
-    }
+    public sealed record Request(string? Name) : ICommand<ErrorOr<Guid>>;
 
     // Validator: internal, inherits BaseValidator<Request>
     // Only validates input shape (non-null, format, range) — NOT business rules
@@ -231,10 +229,11 @@ public static class CreateList
 
 **Key conventions:**
 - **Primary constructors** for dependency injection (enforced readonly via Meziantou.Analyzer MA0143)
-- **Nullable request properties** with FluentValidation `NotNull` rules — ensures all validation
-  errors flow through the same pipeline and produce uniform `ValidationProblemDetails` responses.
-  Trade-off: OpenAPI schema generates nullable types, so generated TypeScript clients have nullable
-  fields. Accepted for now; may integrate FluentValidation rules into OpenAPI schema generation later.
+- **Positional record syntax** for Request types (e.g., `record Request(string? Name) : ICommand<...>;`).
+  Properties are nullable with FluentValidation `NotNull` rules — ensures all validation errors flow
+  through the same pipeline and produce uniform `ValidationProblemDetails` responses. Trade-off:
+  OpenAPI schema generates nullable types, so generated TypeScript clients have nullable fields.
+  Accepted for now; may integrate FluentValidation rules into OpenAPI schema generation later.
 - **`internal` visibility** for Validator and Handler — only the Request (and Response if applicable)
   need to be public for the API layer to reference them.
 - **ErrorOr<T>** as the return type for all handlers — provides a consistent application layer
@@ -251,6 +250,12 @@ public static class CreateList
   operational insight — these are filtered out in production by default and available when
   investigating issues.
 
+### Async Conventions
+
+- **Do not use `ConfigureAwait(false)`**. All backend projects run on ASP.NET Core or the generic
+  host, neither of which has a `SynchronizationContext`. `ConfigureAwait(false)` is a no-op in these
+  environments. The Meziantou.Analyzer rule MA0004 is suppressed globally in `.editorconfig`.
+
 ### Error Handling at the API Boundary
 
 - Handlers return `ErrorOr<T>` — the Application layer never throws exceptions for expected failures.
@@ -260,11 +265,15 @@ public static class CreateList
   - `ErrorType.Conflict` → 409 + `ProblemDetails`
   - `ErrorType.Unauthorized` → 403 + `ProblemDetails`
   - etc.
-- Unexpected exceptions are caught by global middleware and mapped to 500 + `ProblemDetails`.
+- Unexpected exceptions are caught by `UseExceptionHandler()` middleware and mapped to 500 +
+  `ProblemDetails`. `UseStatusCodePages()` covers additional failed requests (404, 405, etc.) that
+  don't throw exceptions but have empty bodies. `AddProblemDetails()` is registered in DI to enable
+  automatic `ProblemDetails` formatting for both middlewares.
 - Mapping is implemented via `ToHttpResult()` extension methods in `Api/Extensions/ErrorOrExtensions.cs`:
   - Extension on `ValueTask<ErrorOr<T>>` enables `await sender.Send(req).ToHttpResult()` (no awkward
     parenthesizing the await).
-  - Extension on `ErrorOr<T>` for direct use.
+  - Sync `onSuccess` overload (`Func<T, IResult>?`) for simple mappings (Created, NoContent).
+  - Async `onSuccess` overload (`Func<T, Task<IResult>>`) for success paths that need async work.
   - Default success mapping: `TypedResults.Ok(value)`. Override via `onSuccess` parameter for 201
     Created (`value => TypedResults.Created(...)`) or 204 NoContent (`_ => TypedResults.NoContent()`).
   - Multiple validation errors are grouped by `Error.Code` into `ValidationProblemDetails`.
@@ -336,7 +345,7 @@ public partial struct ShoplistId;
 // Shoplist.cs
 public class Shoplist
 {
-    public ShoplistId Id { get; set; }
+    public ShoplistId Id { get; init; }
 }
 ```
 
@@ -375,11 +384,14 @@ cannot silently miss it.
 use `Shoplist`, `ShoplistItem` — not `ShoppingList`. Keep names concise and domain-specific.
 
 **Property accessors**:
-- `{ get; set; }` — default for most properties. Entities are not rich domain objects yet; keep it
-  simple and tighten when business logic demands it.
-- `{ get; init; }` — use for properties that should be immutable after creation (e.g., `OwnerId`
-  on `Shoplist`). EF Core handles `init` fine via backing fields during materialization. Prefer
-  `init` as the default; only "open up" to `set` when mutation is an actual use case.
+- `{ get; init; }` — **default for most properties**, including entity IDs. EF Core materializes
+  entities through backing fields, so `init` works fine for hydration. Use `init` for all properties
+  unless mutation is an explicit, known use case. This includes `Id` (assigned once by
+  `ValueGeneratedOnAdd`), foreign keys (e.g., `ShoplistId` on `ShoplistItem`), and ownership
+  properties (e.g., `OwnerId`).
+- `{ get; set; }` — use only for properties that are genuinely mutable after creation (e.g., `Name`
+  which can be updated, `IsChecked` which toggles). Only "open up" from `init` to `set` when
+  mutation is an actual use case.
 - **`required`** — use on all properties that must be explicitly set at construction time. This
   includes `Name`, foreign keys, and any value where a silent default would be a bug (e.g.,
   `Position` with 1-based ordering — defaulting to 0 would be wrong). Exclude `Id` (handled by

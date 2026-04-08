@@ -33,7 +33,27 @@ var api = builder
     .AddProject<Projects.Api>(Resources.Api)
     .WithReference(appDb)
     .WaitForCompletion(databaseMigrator)
-    .WithHttpHealthCheck(HealthCheckConstants.Endpoints.Ready);
+    .WithHttpHealthCheck(HealthCheckConstants.Endpoints.Ready)
+    .WithUrlForEndpoint(
+        "http",
+        static _ => new ResourceUrlAnnotation { Url = "/scalar", DisplayText = "Scalar" }
+    )
+    .WithUrlForEndpoint(
+        "http",
+        static _ => new ResourceUrlAnnotation
+        {
+            Url = "/openapi/v1.json",
+            DisplayText = "OpenAPI (json)",
+        }
+    )
+    .WithUrlForEndpoint(
+        "http",
+        static _ => new ResourceUrlAnnotation
+        {
+            Url = "/openapi/v1.yaml",
+            DisplayText = "OpenAPI (yaml)",
+        }
+    );
 
 #endregion
 

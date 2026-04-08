@@ -12,5 +12,7 @@ internal sealed class ShoplistItemConfiguration : IEntityTypeConfiguration<Shopl
         builder.Property(si => si.Id).ValueGeneratedOnAdd();
 
         builder.Property(si => si.Name).IsRequired();
+
+        builder.HasIndex(si => new { si.ShoplistId, si.Position }).IsUnique();
     }
 }

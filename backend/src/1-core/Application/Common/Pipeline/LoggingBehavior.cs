@@ -22,7 +22,7 @@ internal sealed class LoggingBehavior<TMessage, TResponse>(
         var stopwatch = Stopwatch.StartNew();
         try
         {
-            var response = await next(message, cancellationToken).ConfigureAwait(false);
+            var response = await next(message, cancellationToken);
             stopwatch.Stop();
 
             logger.LogDebug(

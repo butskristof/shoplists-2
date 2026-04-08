@@ -4,13 +4,19 @@ namespace Shoplists.Api.Extensions;
 
 internal static class ErrorOrExtensions
 {
-    internal static async Task<IResult> ToHttpResult<T>(
-        this ValueTask<ErrorOr<T>> resultTask,
-        Func<T, IResult>? onSuccess = null
-    )
+    extension<T>(ValueTask<ErrorOr<T>> resultTask)
     {
-        var result = await resultTask.ConfigureAwait(false);
-        return result.ToHttpResult(onSuccess);
+        internal async Task<IResult> ToHttpResult(Func<T, IResult>? onSuccess = null)
+        {
+            var result = await resultTask;
+            return result.ToHttpResult(onSuccess);
+        }
+
+        internal async Task<IResult> ToHttpResult(Func<T, Task<IResult>> onSuccess)
+        {
+            var result = await resultTask;
+            return result.IsError ? ToErrorResult(result.Errors) : await onSuccess(result.Value);
+        }
     }
 
     private static IResult ToHttpResult<T>(
@@ -19,9 +25,7 @@ internal static class ErrorOrExtensions
     )
     {
         if (result.IsError)
-        {
             return ToErrorResult(result.Errors);
-        }
 
         var successMapper = onSuccess ?? TypedResults.Ok;
         return successMapper(result.Value);
