@@ -48,7 +48,7 @@ internal static class ShoplistEndpoints
         sender.Send(new GetShoplists.Request()).ToHttpResult();
 
     private static Task<IResult> GetShoplist(ISender sender, ShoplistId id) =>
-        sender.Send(new GetShoplist.Request { Id = id }).ToHttpResult();
+        sender.Send(new GetShoplist.Request(id)).ToHttpResult();
 
     private static Task<IResult> CreateShoplist(ISender sender, CreateShoplist.Request request) =>
         sender
@@ -68,6 +68,6 @@ internal static class ShoplistEndpoints
 
     private static Task<IResult> DeleteShoplist(ISender sender, ShoplistId id) =>
         sender
-            .Send(new DeleteShoplist.Request { Id = id })
+            .Send(new DeleteShoplist.Request(id))
             .ToHttpResult(onSuccess: _ => TypedResults.NoContent());
 }

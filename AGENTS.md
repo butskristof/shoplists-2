@@ -194,13 +194,11 @@ together and scopes type names to avoid collisions (e.g., `CreateList.Request` v
 ```csharp
 public static class CreateList
 {
-    // Request: sealed record, implements ICommand<ErrorOr<T>> or IQuery<ErrorOr<T>>
+    // Request: sealed record with positional (primary constructor) syntax.
+    // Implements ICommand<ErrorOr<T>> or IQuery<ErrorOr<T>>.
     // Properties are nullable with FluentValidation enforcing non-null — this ensures uniform
     // ValidationProblemDetails responses and keeps OpenAPI contract control in our hands.
-    public sealed record Request : ICommand<ErrorOr<Guid>>
-    {
-        public string? Name { get; init; }
-    }
+    public sealed record Request(string? Name) : ICommand<ErrorOr<Guid>>;
 
     // Validator: internal, inherits BaseValidator<Request>
     // Only validates input shape (non-null, format, range) — NOT business rules
@@ -231,10 +229,11 @@ public static class CreateList
 
 **Key conventions:**
 - **Primary constructors** for dependency injection (enforced readonly via Meziantou.Analyzer MA0143)
-- **Nullable request properties** with FluentValidation `NotNull` rules — ensures all validation
-  errors flow through the same pipeline and produce uniform `ValidationProblemDetails` responses.
-  Trade-off: OpenAPI schema generates nullable types, so generated TypeScript clients have nullable
-  fields. Accepted for now; may integrate FluentValidation rules into OpenAPI schema generation later.
+- **Positional record syntax** for Request types (e.g., `record Request(string? Name) : ICommand<...>;`).
+  Properties are nullable with FluentValidation `NotNull` rules — ensures all validation errors flow
+  through the same pipeline and produce uniform `ValidationProblemDetails` responses. Trade-off:
+  OpenAPI schema generates nullable types, so generated TypeScript clients have nullable fields.
+  Accepted for now; may integrate FluentValidation rules into OpenAPI schema generation later.
 - **`internal` visibility** for Validator and Handler — only the Request (and Response if applicable)
   need to be public for the API layer to reference them.
 - **ErrorOr<T>** as the return type for all handlers — provides a consistent application layer

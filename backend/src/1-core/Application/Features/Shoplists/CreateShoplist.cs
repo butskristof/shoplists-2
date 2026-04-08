@@ -10,10 +10,7 @@ namespace Shoplists.Application.Features.Shoplists;
 
 public static class CreateShoplist
 {
-    public sealed record Request : ICommand<ErrorOr<Response>>
-    {
-        public string? Name { get; init; }
-    }
+    public sealed record Request(string? Name) : ICommand<ErrorOr<Response>>;
 
     public sealed record Response(ShoplistId Id);
 

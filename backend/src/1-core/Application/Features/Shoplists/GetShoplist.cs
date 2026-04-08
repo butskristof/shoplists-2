@@ -10,10 +10,7 @@ namespace Shoplists.Application.Features.Shoplists;
 
 public static class GetShoplist
 {
-    public sealed record Request : IQuery<ErrorOr<Response>>
-    {
-        public ShoplistId? Id { get; init; }
-    }
+    public sealed record Request(ShoplistId? Id) : IQuery<ErrorOr<Response>>;
 
     public sealed record Response(ShoplistId Id, string Name, IReadOnlyList<ItemResponse> Items);
 
@@ -47,9 +44,7 @@ public static class GetShoplist
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (shoplist is null)
-            {
                 return Error.NotFound(description: "Shoplist not found.");
-            }
 
             logger.LogDebug("Returning shoplist {ShoplistId}", request.Id);
 

@@ -10,10 +10,7 @@ namespace Shoplists.Application.Features.Shoplists;
 
 public static class DeleteShoplist
 {
-    public sealed record Request : ICommand<ErrorOr<Success>>
-    {
-        public ShoplistId? Id { get; init; }
-    }
+    public sealed record Request(ShoplistId? Id) : ICommand<ErrorOr<Success>>;
 
     internal sealed class Validator : BaseValidator<Request>
     {
@@ -37,9 +34,7 @@ public static class DeleteShoplist
             );
 
             if (shoplist is null)
-            {
                 return Error.NotFound(description: "Shoplist not found.");
-            }
 
             dbContext.Shoplists.Remove(shoplist);
             await dbContext.SaveChangesAsync(cancellationToken);

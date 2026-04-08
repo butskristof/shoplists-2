@@ -10,11 +10,7 @@ namespace Shoplists.Application.Features.Shoplists;
 
 public static class UpdateShoplist
 {
-    public sealed record Request : ICommand<ErrorOr<Success>>
-    {
-        public ShoplistId? Id { get; init; }
-        public string? Name { get; init; }
-    }
+    public sealed record Request(ShoplistId? Id, string? Name) : ICommand<ErrorOr<Success>>;
 
     internal sealed class Validator : BaseValidator<Request>
     {
