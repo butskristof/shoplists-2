@@ -32,7 +32,9 @@ app
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi(pattern: "/openapi/{documentName}.json");
+    app.MapOpenApi(pattern: "/openapi/{documentName}.yaml");
+    app.MapOpenApi(pattern: "/openapi/{documentName}.yml");
     app.MapScalarApiReference();
 }
 
