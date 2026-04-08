@@ -1,10 +1,6 @@
-using Microsoft.AspNetCore.OpenApi;
 using Scalar.AspNetCore;
-using Shoplists.Api.Authentication;
 using Shoplists.Api.Extensions;
-using Shoplists.Api.OpenApi;
 using Shoplists.Application;
-using Shoplists.Application.Common.Authentication;
 using Shoplists.Infrastructure;
 using Shoplists.Persistence;
 using Shoplists.ServiceDefaults;
@@ -17,30 +13,22 @@ builder.AddServiceDefaults();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure();
 builder.AddPersistence(Resources.AppDb);
-
-builder.Services.AddScoped<ICurrentUser, FakeCurrentUser>();
-
-builder.Services.AddOpenApi(options =>
-{
-    options.CreateSchemaReferenceId = typeInfo =>
-    {
-        var defaultId = OpenApiOptions.CreateDefaultSchemaReferenceId(typeInfo);
-        if (defaultId is null)
-            return null;
-
-        // Nested types (e.g. CreateShoplist.Response) get the default ID "Response",
-        // which collides when multiple outer classes define the same nested type name.
-        // Prefix with the declaring type name to match C# nested type notation.
-        var declaringType = typeInfo.Type.DeclaringType;
-        return declaringType is not null ? $"{declaringType.Name}.{defaultId}" : defaultId;
-    };
-
-    options.AddSchemaTransformer<StronglyTypedIdSchemaTransformer>();
-});
+builder.Services.AddApi();
 
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
+
+app
+// the default exception handler will catch unhandled exceptions and return
+// them as ProblemDetails with status code 500 Internal Server Error
+.UseExceptionHandler()
+    // the status code pages will map additional failed requests (outside of
+    // those throwing exceptions) to responses with ProblemDetails body content
+    // this includes 404, method not allowed, ... (all status codes between 400 and 599)
+    // keep in mind that this middleware will only activate if the body is empty when
+    // it reaches it
+    .UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {

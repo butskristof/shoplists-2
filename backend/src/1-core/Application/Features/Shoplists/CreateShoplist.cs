@@ -39,7 +39,7 @@ public static class CreateShoplist
             var shoplist = new Shoplist { Name = request.Name!, OwnerId = currentUser.UserId };
 
             dbContext.Shoplists.Add(shoplist);
-            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogDebug("Created shoplist {ShoplistId}", shoplist.Id);
 

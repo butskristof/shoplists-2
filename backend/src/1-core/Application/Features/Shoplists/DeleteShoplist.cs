@@ -31,9 +31,10 @@ public static class DeleteShoplist
             CancellationToken cancellationToken
         )
         {
-            var shoplist = await dbContext
-                .Shoplists.FirstOrDefaultAsync(s => s.Id == request.Id!.Value, cancellationToken)
-                .ConfigureAwait(false);
+            var shoplist = await dbContext.Shoplists.FirstOrDefaultAsync(
+                s => s.Id == request.Id!.Value,
+                cancellationToken
+            );
 
             if (shoplist is null)
             {
@@ -41,7 +42,7 @@ public static class DeleteShoplist
             }
 
             dbContext.Shoplists.Remove(shoplist);
-            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogDebug("Deleted shoplist {ShoplistId}", request.Id);
 

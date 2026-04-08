@@ -33,17 +33,16 @@ public static class UpdateShoplist
             CancellationToken cancellationToken
         )
         {
-            var shoplist = await dbContext
-                .Shoplists.FirstOrDefaultAsync(s => s.Id == request.Id!.Value, cancellationToken)
-                .ConfigureAwait(false);
+            var shoplist = await dbContext.Shoplists.FirstOrDefaultAsync(
+                s => s.Id == request.Id!.Value,
+                cancellationToken
+            );
 
             if (shoplist is null)
-            {
                 return Error.NotFound(description: "Shoplist not found.");
-            }
 
             shoplist.Name = request.Name!;
-            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogDebug("Updated shoplist {ShoplistId}", shoplist.Id);
 

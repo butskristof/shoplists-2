@@ -44,8 +44,7 @@ public static class GetShoplist
                         .Select(i => new ItemResponse(i.Id, i.Name, i.IsChecked, i.Position))
                         .ToList()
                 ))
-                .FirstOrDefaultAsync(cancellationToken)
-                .ConfigureAwait(false);
+                .FirstOrDefaultAsync(cancellationToken);
 
             if (shoplist is null)
             {

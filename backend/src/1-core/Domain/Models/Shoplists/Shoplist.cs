@@ -4,7 +4,7 @@ namespace Shoplists.Domain.Models.Shoplists;
 
 public class Shoplist
 {
-    public ShoplistId Id { get; set; }
+    public ShoplistId Id { get; init; }
 
     public required string Name { get; set; }
 

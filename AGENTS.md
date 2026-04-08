@@ -251,6 +251,12 @@ public static class CreateList
   operational insight — these are filtered out in production by default and available when
   investigating issues.
 
+### Async Conventions
+
+- **Do not use `ConfigureAwait(false)`**. All backend projects run on ASP.NET Core or the generic
+  host, neither of which has a `SynchronizationContext`. `ConfigureAwait(false)` is a no-op in these
+  environments. The Meziantou.Analyzer rule MA0004 is suppressed globally in `.editorconfig`.
+
 ### Error Handling at the API Boundary
 
 - Handlers return `ErrorOr<T>` — the Application layer never throws exceptions for expected failures.
@@ -260,11 +266,15 @@ public static class CreateList
   - `ErrorType.Conflict` → 409 + `ProblemDetails`
   - `ErrorType.Unauthorized` → 403 + `ProblemDetails`
   - etc.
-- Unexpected exceptions are caught by global middleware and mapped to 500 + `ProblemDetails`.
+- Unexpected exceptions are caught by `UseExceptionHandler()` middleware and mapped to 500 +
+  `ProblemDetails`. `UseStatusCodePages()` covers additional failed requests (404, 405, etc.) that
+  don't throw exceptions but have empty bodies. `AddProblemDetails()` is registered in DI to enable
+  automatic `ProblemDetails` formatting for both middlewares.
 - Mapping is implemented via `ToHttpResult()` extension methods in `Api/Extensions/ErrorOrExtensions.cs`:
   - Extension on `ValueTask<ErrorOr<T>>` enables `await sender.Send(req).ToHttpResult()` (no awkward
     parenthesizing the await).
-  - Extension on `ErrorOr<T>` for direct use.
+  - Sync `onSuccess` overload (`Func<T, IResult>?`) for simple mappings (Created, NoContent).
+  - Async `onSuccess` overload (`Func<T, Task<IResult>>`) for success paths that need async work.
   - Default success mapping: `TypedResults.Ok(value)`. Override via `onSuccess` parameter for 201
     Created (`value => TypedResults.Created(...)`) or 204 NoContent (`_ => TypedResults.NoContent()`).
   - Multiple validation errors are grouped by `Error.Code` into `ValidationProblemDetails`.
@@ -336,7 +346,7 @@ public partial struct ShoplistId;
 // Shoplist.cs
 public class Shoplist
 {
-    public ShoplistId Id { get; set; }
+    public ShoplistId Id { get; init; }
 }
 ```
 
@@ -375,11 +385,14 @@ cannot silently miss it.
 use `Shoplist`, `ShoplistItem` — not `ShoppingList`. Keep names concise and domain-specific.
 
 **Property accessors**:
-- `{ get; set; }` — default for most properties. Entities are not rich domain objects yet; keep it
-  simple and tighten when business logic demands it.
-- `{ get; init; }` — use for properties that should be immutable after creation (e.g., `OwnerId`
-  on `Shoplist`). EF Core handles `init` fine via backing fields during materialization. Prefer
-  `init` as the default; only "open up" to `set` when mutation is an actual use case.
+- `{ get; init; }` — **default for most properties**, including entity IDs. EF Core materializes
+  entities through backing fields, so `init` works fine for hydration. Use `init` for all properties
+  unless mutation is an explicit, known use case. This includes `Id` (assigned once by
+  `ValueGeneratedOnAdd`), foreign keys (e.g., `ShoplistId` on `ShoplistItem`), and ownership
+  properties (e.g., `OwnerId`).
+- `{ get; set; }` — use only for properties that are genuinely mutable after creation (e.g., `Name`
+  which can be updated, `IsChecked` which toggles). Only "open up" from `init` to `set` when
+  mutation is an actual use case.
 - **`required`** — use on all properties that must be explicitly set at construction time. This
   includes `Name`, foreign keys, and any value where a silent default would be a bug (e.g.,
   `Position` with 1-based ordering — defaulting to 0 would be wrong). Exclude `Id` (handled by
