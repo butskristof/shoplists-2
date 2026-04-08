@@ -288,6 +288,9 @@ and tags, then maps individual endpoints within that group.
 **Structure:**
 ```
 Api/
+  Authentication/
+    AuthenticationSettings.cs      -> Settings record (Authority, Audience) bound from config
+    HttpContextCurrentUser.cs      -> ICurrentUser impl, reads "sub" claim from HttpContext
   Endpoints/
     ShoplistEndpoints.cs           -> MapGroup("/shoplists"), maps GET/POST/PUT/DELETE
     ShoplistItemEndpoints.cs       -> MapGroup("/shoplists/{id}/items"), maps item operations
@@ -295,6 +298,7 @@ Api/
     EndpointRouteBuilderExtensions.cs -> MapShoplistsApi() — top-level /api prefix group
     ErrorOrExtensions.cs           -> ToHttpResult() extensions for ErrorOr → IResult mapping
   OpenApi/
+    BearerSecuritySchemeTransformer.cs -> Adds Bearer security scheme to OpenAPI doc
     StronglyTypedIdSchemaTransformer.cs -> Makes strongly-typed IDs appear as string/uuid in OpenAPI
 ```
 
@@ -313,6 +317,44 @@ Scalar serves the docs UI at `/scalar/v1` (dev-only). The OpenAPI spec is at `/o
 
 **OpenAPI schema transformers**: `StronglyTypedIdSchemaTransformer` rewrites strongly-typed ID
 schemas. When adding a new ID type, also add it to the transformer's type mapping dictionary.
+
+### Backend Authentication & Authorization
+
+**Approach**: JWT Bearer token validation. The API validates access tokens issued by an external OIDC
+provider. The frontend (Nuxt BFF) handles the OIDC flow, stores tokens server-side in Valkey, and
+attaches the access token as a `Bearer` header when proxying API calls.
+
+**JWT Bearer registration** (`Api/Extensions/DependencyInjection.cs`):
+- `AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(...)` with Authority and
+  Audience from `AuthenticationSettings`.
+- **`MapInboundClaims = false`** — preserves OIDC-standard claim types (`"sub"`, `"name"`, etc.).
+  Without this, ASP.NET Core remaps them to long XML namespace URIs. This means claim lookups use
+  `"sub"` directly, not `ClaimTypes.NameIdentifier`.
+
+**Configuration** (`Api/Authentication/AuthenticationSettings.cs`):
+- `Authority`: OIDC issuer base URL. The JWT handler auto-discovers signing keys at
+  `{Authority}/.well-known/openid-configuration`.
+- `Audience`: Expected `aud` claim in access tokens.
+- Values come from Aspire parameters (`oidc-authority`, `oidc-audience`) injected as environment
+  variables (`Authentication__Authority`, `Authentication__Audience`).
+
+**ICurrentUser implementation** (`Api/Authentication/HttpContextCurrentUser.cs`):
+- Reads the `"sub"` claim from `HttpContext.User` via `IHttpContextAccessor`.
+- Wraps the value in `UserId` (string-backed strongly-typed ID).
+- Throws `InvalidOperationException` if no `sub` claim is present — this is a configuration error
+  since all API endpoints require authentication.
+
+**Authorization strategy**: `.RequireAuthorization()` on the `/api` route group in
+`EndpointRouteBuilderExtensions.MapShoplistsApi()`. This protects all API endpoints while leaving
+OpenAPI, Scalar, and health check endpoints unaffected (they live outside `/api`). We chose this
+over `FallbackPolicy` because all real endpoints are already centralized under `/api`.
+
+**OpenAPI security** (`Api/OpenApi/BearerSecuritySchemeTransformer.cs`):
+- `IOpenApiDocumentTransformer` that declares a Bearer security scheme in the OpenAPI document
+  components and sets it as a document-level security requirement.
+- Document-level security means "all operations require this by default" — the standard OpenAPI
+  pattern. Individual operations can override with an empty security array if needed.
+- Makes Scalar show the Bearer token input for authenticated testing.
 
 ### Strongly-Typed Entity IDs
 
@@ -583,6 +625,7 @@ this file updated accordingly.
 | Handler conventions | Static class wrapper, nullable props, primary constructors, internal visibility | **Decided** |
 | Strongly-typed entity IDs | StronglyTypedId source generator, Guid-backed, EF Core converters via `guid-efcore` template | **Decided** |
 | Database migrations | Dedicated DatabaseMigrator worker host, Aspire WaitForCompletion, migrations in Persistence, DesignTimeDbContextFactory for CLI | **Decided** |
+| Backend authentication | JWT Bearer via `Microsoft.AspNetCore.Authentication.JwtBearer`, `MapInboundClaims = false`, `ICurrentUser` reads `"sub"` from HttpContext, group-level `RequireAuthorization()` on `/api` | **Decided** |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |

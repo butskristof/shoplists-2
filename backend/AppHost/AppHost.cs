@@ -29,10 +29,19 @@ var databaseMigrator = builder
 
 #region API
 
+var oidcAuthority = builder
+    .AddParameter("oidc-authority")
+    .WithDescription("OIDC issuer base URL (JWT Bearer Authority for the backend API).");
+var oidcAudience = builder
+    .AddParameter("oidc-audience")
+    .WithDescription("Expected audience claim in JWT access tokens.");
+
 var api = builder
     .AddProject<Projects.Api>(Resources.Api)
     .WithReference(appDb)
     .WaitForCompletion(databaseMigrator)
+    .WithEnvironment("Authentication__Authority", oidcAuthority)
+    .WithEnvironment("Authentication__Audience", oidcAudience)
     .WithHttpHealthCheck(HealthCheckConstants.Endpoints.Ready)
     .WithUrlForEndpoint(
         "http",
