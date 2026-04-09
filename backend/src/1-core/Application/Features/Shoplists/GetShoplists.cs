@@ -22,7 +22,8 @@ public static class GetShoplists
         )
         {
             var shoplists = await dbContext
-                .Shoplists.Select(s => new Response(s.Id, s.Name))
+                .CurrentUserShoplists()
+                .Select(s => new Response(s.Id, s.Name))
                 .ToListAsync(cancellationToken);
 
             logger.LogDebug("Returning {Count} shoplists", shoplists.Count);

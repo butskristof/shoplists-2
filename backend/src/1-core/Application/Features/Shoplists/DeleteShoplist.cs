@@ -28,10 +28,9 @@ public static class DeleteShoplist
             CancellationToken cancellationToken
         )
         {
-            var shoplist = await dbContext.Shoplists.FirstOrDefaultAsync(
-                s => s.Id == request.Id!.Value,
-                cancellationToken
-            );
+            var shoplist = await dbContext
+                .CurrentUserShoplists()
+                .FirstOrDefaultAsync(s => s.Id == request.Id!.Value, cancellationToken);
 
             if (shoplist is null)
                 return Error.NotFound(description: "Shoplist not found.");

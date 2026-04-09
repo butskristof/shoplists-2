@@ -33,7 +33,8 @@ public static class GetShoplist
         )
         {
             var shoplist = await dbContext
-                .Shoplists.Where(s => s.Id == request.Id!.Value)
+                .CurrentUserShoplists()
+                .Where(s => s.Id == request.Id!.Value)
                 .Select(s => new Response(
                     s.Id,
                     s.Name,

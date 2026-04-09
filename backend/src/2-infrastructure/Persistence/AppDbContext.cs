@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Shoplists.Application.Common.Authentication;
 using Shoplists.Application.Common.Constants;
 using Shoplists.Application.Common.Persistence;
 using Shoplists.Domain.Models.Shoplists;
@@ -6,14 +7,16 @@ using Shoplists.Persistence.Extensions;
 
 namespace Shoplists.Persistence;
 
-internal sealed class AppDbContext : DbContext, IAppDbContext
+internal sealed class AppDbContext(DbContextOptions options, ICurrentUser currentUser)
+    : DbContext(options),
+        IAppDbContext
 {
-    public AppDbContext(DbContextOptions options)
-        : base(options) { }
-
     #region Entities
 
     public DbSet<Shoplist> Shoplists => Set<Shoplist>();
+
+    public IQueryable<Shoplist> CurrentUserShoplists() =>
+        Shoplists.Where(s => s.OwnerId == currentUser.UserId);
 
     #endregion
 

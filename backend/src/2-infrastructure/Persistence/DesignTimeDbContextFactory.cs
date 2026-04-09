@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Shoplists.Application.Common.Authentication;
+using Shoplists.Domain.Models.Users;
 
 namespace Shoplists.Persistence;
 
@@ -29,6 +31,18 @@ internal sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<A
             .UseNpgsql("Host=localhost")
             .Options;
 
-        return new AppDbContext(options);
+        return new AppDbContext(options, new DesignTimeCurrentUser());
+    }
+
+    /// <summary>
+    /// Dummy <see cref="ICurrentUser"/> for design-time tooling. Never called — <c>dotnet ef</c>
+    /// only reads the model, it never executes queries.
+    /// </summary>
+    private sealed class DesignTimeCurrentUser : ICurrentUser
+    {
+        public UserId UserId =>
+            throw new InvalidOperationException(
+                "Design-time DbContext does not have a current user."
+            );
     }
 }

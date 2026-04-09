@@ -349,6 +349,35 @@ attaches the access token as a `Bearer` header when proxying API calls.
 OpenAPI, Scalar, and health check endpoints unaffected (they live outside `/api`). We chose this
 over `FallbackPolicy` because all real endpoints are already centralized under `/api`.
 
+**Resource authorization — `CurrentUserShoplists()`**: Resource-level authorization (ensuring users
+can only access their own data) is implemented via a scoped query method on `IAppDbContext`:
+- `IQueryable<Shoplist> CurrentUserShoplists()` — returns only shoplists where
+  `OwnerId == currentUser.UserId`. Implemented in `AppDbContext`, which injects `ICurrentUser`.
+- All **read** operations on shoplists (list, get, update, delete) use `CurrentUserShoplists()`
+  instead of the raw `DbSet`. If a user requests another user's shoplist, it naturally surfaces as
+  `NotFound` — no information leakage about other users' data.
+- **Write** operations (create, remove) use the `Shoplists` DbSet directly — `Add()` and `Remove()`
+  are not query operations.
+- **Convention**: reads go through `CurrentUserShoplists()`, writes go through `Shoplists` DbSet.
+  This is a convention, not enforced by the type system. Code review should verify new handlers
+  follow this pattern.
+- **Aggregate root scoping**: Child entities (e.g., `ShoplistItem`) have no `DbSet` and are only
+  accessible through their parent's navigation property. If the parent Shoplist is scoped by
+  `CurrentUserShoplists()`, items are implicitly scoped too. No additional authorization checks
+  needed for child entities accessed through the aggregate root.
+- **Sharing (future)**: When list sharing is added, the `CurrentUserShoplists()` implementation
+  expands to include shared lists. Callers don't change.
+- **Testing**: Authorization is a first-class testing concern. Integration tests must verify
+  cross-user isolation: User A cannot see, update, or delete User B's lists; `GetShoplists` returns
+  only the current user's data. These tests guard against regressions where a handler accidentally
+  uses the raw `Shoplists` DbSet instead of `CurrentUserShoplists()`.
+
+**`ICurrentUser` in non-API hosts**: `AppDbContext` requires `ICurrentUser` via constructor
+injection. Hosts that don't have an HTTP context (DatabaseMigrator, future background jobs) must
+register a dummy `ICurrentUser` that throws on access — these hosts never execute user-scoped
+queries, but the DI container still needs to resolve the dependency. See `MigrationCurrentUser`
+in the DatabaseMigrator host and `DesignTimeCurrentUser` in `DesignTimeDbContextFactory`.
+
 **OpenAPI security** (`Api/OpenApi/BearerSecuritySchemeTransformer.cs`):
 - `IOpenApiDocumentTransformer` that declares a Bearer security scheme in the OpenAPI document
   components and sets it as a document-level security requirement.
@@ -464,6 +493,12 @@ from the configuration code alone.
 - **Indexes** — add explicitly for non-FK properties used in common query patterns (e.g.,
   `OwnerId` for "all lists by user"). EF Core auto-creates indexes for FK columns in configured
   relationships.
+- **`IsImmutableAfterInsert()`** — custom `PropertyBuilder<T>` extension
+  (`Persistence/Extensions/PropertyBuilderExtensions.cs`) that sets
+  `AfterSaveBehavior(PropertySaveBehavior.Throw)`. Apply to non-key properties that must never
+  change after the initial insert (e.g., `OwnerId`, foreign keys to parent aggregates like
+  `ShoplistId` on `ShoplistItem`). Do NOT apply to primary key properties — EF Core already
+  protects those via `ValueGeneratedOnAdd` conventions.
 
 ### Database Migrations
 
@@ -626,6 +661,7 @@ this file updated accordingly.
 | Strongly-typed entity IDs | StronglyTypedId source generator, Guid-backed, EF Core converters via `guid-efcore` template | **Decided** |
 | Database migrations | Dedicated DatabaseMigrator worker host, Aspire WaitForCompletion, migrations in Persistence, DesignTimeDbContextFactory for CLI | **Decided** |
 | Backend authentication | JWT Bearer via `Microsoft.AspNetCore.Authentication.JwtBearer`, `MapInboundClaims = false`, `ICurrentUser` reads `"sub"` from HttpContext, group-level `RequireAuthorization()` on `/api` | **Decided** |
+| Resource authorization | `CurrentUserShoplists()` on `IAppDbContext`/`AppDbContext`, scoped by `OwnerId`. Convention: reads via scoped method, writes via raw DbSet. Aggregate root scoping for child entities. `IsImmutableAfterInsert()` for immutable non-key properties. | **Decided** |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
