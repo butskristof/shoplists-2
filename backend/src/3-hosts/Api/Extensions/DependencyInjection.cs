@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.OpenApi;
-using Microsoft.Extensions.Options;
 using Shoplists.Api.Authentication;
 using Shoplists.Api.OpenApi;
 using Shoplists.Application.Common.Authentication;
@@ -11,18 +10,30 @@ internal static class DependencyInjection
 {
     extension(IServiceCollection services)
     {
+        /// <summary>
+        /// Configure IOptions with settings for runtime use through dependency injection
+        /// </summary>
+        /// <param name="configuration">The configuration object used to provide application settings.</param>
+        /// <returns>The updated IServiceCollection instance for chaining calls.</returns>
         internal IServiceCollection AddConfiguration(IConfiguration configuration)
         {
-            services
-                .AddOptions<AuthenticationSettings>()
-                .Bind(configuration.GetSection(AuthenticationSettings.SectionName));
+            // auth settings are only used once during setup, not necessary to expose them to the runtime
+            // services
+            //     .AddOptions<AuthenticationSettings>()
+            //     .Bind(configuration.GetSection(AuthenticationSettings.SectionName));
 
             return services;
         }
 
-        internal IServiceCollection AddApi()
+        /// <summary>
+        /// Configures API-related services, including authentication, authorization,
+        /// problem details, and OpenAPI configuration, for runtime use through dependency injection.
+        /// </summary>
+        /// <param name="configuration">The configuration object used to provide application settings.</param>
+        /// <returns>The updated <see cref="IServiceCollection"/> instance for chaining calls.</returns>
+        internal IServiceCollection AddApi(IConfiguration configuration)
         {
-            services.AddAuth();
+            services.AddAuth(configuration);
 
             services.AddProblemDetails();
             services.AddOpenApi();
@@ -30,12 +41,23 @@ internal static class DependencyInjection
             return services;
         }
 
-        private IServiceCollection AddAuth()
+        /// <summary>
+        /// Configures JWT-based authentication and authorization services,
+        /// including setup for JwtBearer authentication, authorization policies,
+        /// and current user handling through dependency injection.
+        /// </summary>
+        /// <param name="configuration">The configuration object used to provide authentication settings.</param>
+        /// <returns>The updated IServiceCollection instance for chaining calls.</returns>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the required "Authentication" configuration section is missing.
+        /// </exception>
+        private IServiceCollection AddAuth(IConfiguration configuration)
         {
-            using var scope = services.BuildServiceProvider().CreateScope();
-            var settings = scope.ServiceProvider.GetService<IOptions<AuthenticationSettings>>();
-            if (settings is null)
-                throw new InvalidOperationException(
+            var settings =
+                configuration
+                    .GetSection(AuthenticationSettings.SectionName)
+                    .Get<AuthenticationSettings>()
+                ?? throw new InvalidOperationException(
                     $"Missing required configuration section '{AuthenticationSettings.SectionName}'."
                 );
 
@@ -43,8 +65,8 @@ internal static class DependencyInjection
                 .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
-                    options.Authority = settings.Value.Authority;
-                    options.Audience = settings.Value.Audience;
+                    options.Authority = settings.Authority;
+                    options.Audience = settings.Audience;
                     options.MapInboundClaims = false;
                 });
 
@@ -55,6 +77,11 @@ internal static class DependencyInjection
             return services;
         }
 
+        /// <summary>
+        /// Configures OpenAPI-related services for API documentation generation and customization
+        /// using dependency injection.
+        /// </summary>
+        /// <returns>The updated <see cref="IServiceCollection"/> instance for chaining calls.</returns>
         private IServiceCollection AddOpenApi()
         {
             services.AddOpenApi(options =>

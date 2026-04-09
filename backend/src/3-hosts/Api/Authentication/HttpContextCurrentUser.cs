@@ -4,10 +4,20 @@ using Shoplists.Domain.Models.Users;
 
 namespace Shoplists.Api.Authentication;
 
-// Reads the "sub" (subject) claim from the authenticated user's JWT.
-// With MapInboundClaims = false, OIDC claim types are preserved as-is.
-// Throws if no authenticated user — all API endpoints require auth,
-// so reaching this code without a "sub" claim indicates a configuration error.
+/// <summary>
+/// Provides access to the current authenticated user's identifier by reading the "sub" (subject) claim from the JSON
+/// Web Token (JWT) of the authenticated user. Ensures that the claim is present and valid for all authenticated API
+/// requests.
+/// </summary>
+/// <remarks>
+/// This class relies on the <see cref="IHttpContextAccessor"/> to access the current HTTP context. The "sub" claim must
+/// be included in the JWT token issued by the authentication provider. If no authenticated user or "sub" claim is
+/// found, an exception is thrown, as reaching this code without proper authentication indicates a configuration error.
+/// </remarks>
+/// <exception cref="InvalidOperationException">
+/// Thrown if the "sub" claim is missing from the authenticated user's JWT token. This likely indicates that the JWT
+/// Bearer authentication is not configured correctly or claims mapping settings are incorrect.
+/// </exception>
 internal sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAccessor)
     : ICurrentUser
 {

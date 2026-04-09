@@ -1,3 +1,4 @@
+using Projects;
 using Shoplists.ServiceDefaults.Constants;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -21,7 +22,7 @@ var appDb = postgres.AddDatabase(Resources.AppDb);
 // If the migrator fails, dependent resources remain blocked — the failure is immediately
 // visible in the Aspire dashboard.
 var databaseMigrator = builder
-    .AddProject<Projects.DatabaseMigrator>(Resources.DatabaseMigrator)
+    .AddProject<DatabaseMigrator>(Resources.DatabaseMigrator)
     .WithReference(appDb)
     .WaitFor(appDb);
 
@@ -37,7 +38,7 @@ var oidcAudience = builder
     .WithDescription("Expected audience claim in JWT access tokens.");
 
 var api = builder
-    .AddProject<Projects.Api>(Resources.Api)
+    .AddProject<Api>(Resources.Api)
     .WithReference(appDb)
     .WaitForCompletion(databaseMigrator)
     .WithEnvironment("Authentication__Authority", oidcAuthority)

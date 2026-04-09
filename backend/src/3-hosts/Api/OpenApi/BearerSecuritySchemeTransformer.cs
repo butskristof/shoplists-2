@@ -3,6 +3,9 @@ using Microsoft.OpenApi;
 
 namespace Shoplists.Api.OpenApi;
 
+/// <summary>
+/// A transformer that modifies the OpenAPI document to add a bearer security scheme for authentication.
+/// </summary>
 internal sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransformer
 {
     public Task TransformAsync(

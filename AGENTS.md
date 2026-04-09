@@ -181,9 +181,12 @@ Application/
       GetShoplist.cs
       GetShoplists.cs
       ...
-    ShoplistItems/
-      TickItem.cs
-      ...
+      Items/                       -> Child entity handlers nested under aggregate root
+        CreateShoplistItem.cs
+        DeleteShoplistItem.cs
+        UpdateShoplistItem.cs
+        UpdateShoplistItemPosition.cs
+        UpdateShoplistItemChecked.cs
 ```
 
 ### Handler File Convention
@@ -241,6 +244,47 @@ public static class CreateList
 - **Split into folder** only when a handler file grows very large (100+ lines in the handler method).
   For typical CRUD, single file is preferred.
 
+### Child Entity Handler Organization
+
+Child entity handlers (e.g., ShoplistItem) live in a subfolder under their aggregate root's feature
+folder: `Features/Shoplists/Items/`. The namespace mirrors the folder structure
+(`Application.Features.Shoplists.Items`). This keeps child entity use cases grouped with their
+aggregate root rather than promoted to a sibling feature folder.
+
+**Handler split strategy for ShoplistItem** — a hybrid approach:
+- **`UpdateShoplistItem`** (`PUT`): entity-level properties (Name, future quantity/price/unit). A
+  single handler that grows as properties are added. Does not include `IsChecked` or `Position`.
+- **`UpdateShoplistItemPosition`** (`PATCH /position`): dedicated handler because reordering mutates
+  sibling items (shifts positions) — different side effects than a simple property change.
+- **`UpdateShoplistItemChecked`** (`PATCH /checked`): dedicated handler because checked state has
+  distinct semantics (client sends desired state for idempotency, not a toggle). Request body is
+  `{ isChecked: bool }`.
+- **`CreateShoplistItem`** (`POST`) and **`DeleteShoplistItem`** (`DELETE`): standard CRUD.
+
+**Aggregate root methods for collection & position management**: Operations that mutate the `_items`
+private collection or coordinate positions across items are methods on `Shoplist` (the aggregate
+root), not inline in handlers. This centralizes position invariant logic:
+- `ShoplistItem AddItem(string name)` — assigns position (max + 1), adds to collection, returns item
+- `void RemoveItem(ShoplistItemId)` — removes from collection, closes position gap. Throws
+  `InvalidOperationException` if item not found (caller should validate first).
+- `bool MoveItem(ShoplistItemId, int newPosition)` — shifts affected range. Returns `false` if
+  position is out of bounds (handler translates to validation error). Throws
+  `InvalidOperationException` if item not found (caller should validate first).
+
+**Error handling convention for domain methods**: Item-not-found is an exceptional situation (the
+handler has already loaded the shoplist with items — if the item isn't there, it's a race condition
+or programming error), so domain methods throw. Position-out-of-range is a business rule validation
+that the handler translates to a user-facing error, so it returns `false`. All handlers find-or-404
+the item via `shoplist.Items.FirstOrDefault(...)` before calling domain methods.
+
+Simple property changes (`Name`, `IsChecked`) are done directly on item references obtained via
+`shoplist.Items.FirstOrDefault(...)` — the returned objects are EF Core tracked entities, so
+property mutations are detected by `SaveChangesAsync`.
+
+**Authorization**: All item handlers load the parent shoplist via
+`CurrentUserShoplists().Include(s => s.Items)`. If the shoplist doesn't belong to the current user,
+it surfaces as NotFound. Items are implicitly scoped through the aggregate root.
+
 ### Logging Philosophy
 
 - Pipeline behaviors handle cross-cutting logging (handler entry/exit, timing, validation failures).
@@ -293,7 +337,7 @@ Api/
     HttpContextCurrentUser.cs      -> ICurrentUser impl, reads "sub" claim from HttpContext
   Endpoints/
     ShoplistEndpoints.cs           -> MapGroup("/shoplists"), maps GET/POST/PUT/DELETE
-    ShoplistItemEndpoints.cs       -> MapGroup("/shoplists/{id}/items"), maps item operations
+    ShoplistItemEndpoints.cs       -> MapGroup("/shoplists/{listId}/items"), maps item CRUD + position/checked
   Extensions/
     EndpointRouteBuilderExtensions.cs -> MapShoplistsApi() — top-level /api prefix group
     ErrorOrExtensions.cs           -> ToHttpResult() extensions for ErrorOr → IResult mapping
@@ -662,6 +706,7 @@ this file updated accordingly.
 | Database migrations | Dedicated DatabaseMigrator worker host, Aspire WaitForCompletion, migrations in Persistence, DesignTimeDbContextFactory for CLI | **Decided** |
 | Backend authentication | JWT Bearer via `Microsoft.AspNetCore.Authentication.JwtBearer`, `MapInboundClaims = false`, `ICurrentUser` reads `"sub"` from HttpContext, group-level `RequireAuthorization()` on `/api` | **Decided** |
 | Resource authorization | `CurrentUserShoplists()` on `IAppDbContext`/`AppDbContext`, scoped by `OwnerId`. Convention: reads via scoped method, writes via raw DbSet. Aggregate root scoping for child entities. `IsImmutableAfterInsert()` for immutable non-key properties. | **Decided** |
+| ShoplistItem endpoint design | Hybrid handler split: `UpdateShoplistItem` (PUT) for entity-level props, `UpdateShoplistItemPosition` (PATCH) and `UpdateShoplistItemChecked` (PATCH) as dedicated handlers. Aggregate root methods on `Shoplist` for collection/position management. Handlers in `Items/` subfolder under `Features/Shoplists/`. | **Decided** |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
