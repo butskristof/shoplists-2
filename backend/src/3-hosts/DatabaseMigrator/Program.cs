@@ -1,3 +1,4 @@
+using Shoplists.Application.Common.Authentication;
 using Shoplists.DatabaseMigrator;
 using Shoplists.Persistence;
 using Shoplists.ServiceDefaults;
@@ -19,6 +20,11 @@ builder.AddServiceDefaults();
 // This is the same AddPersistence call the API host uses — the connection name must match
 // the database resource name defined in the AppHost.
 builder.AddPersistence(Resources.AppDb);
+
+// AppDbContext requires ICurrentUser for authorization-scoped queries. The migrator never
+// executes application queries — it only runs MigrateAsync() — but the DI container still
+// needs to resolve the dependency when constructing AppDbContext.
+builder.Services.AddSingleton<ICurrentUser, MigrationCurrentUser>();
 
 builder.Services.AddHostedService<Worker>();
 

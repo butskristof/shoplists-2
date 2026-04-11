@@ -2,6 +2,10 @@ using ErrorOr;
 
 namespace Shoplists.Api.Extensions;
 
+/// <summary>
+/// Provides extension methods for mapping ErrorOr results to (typed) HTTP results which can be returned from the
+/// minimal API endpoints
+/// </summary>
 internal static class ErrorOrExtensions
 {
     extension<T>(ValueTask<ErrorOr<T>> resultTask)

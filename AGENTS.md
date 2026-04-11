@@ -181,9 +181,12 @@ Application/
       GetShoplist.cs
       GetShoplists.cs
       ...
-    ShoplistItems/
-      TickItem.cs
-      ...
+      Items/                       -> Child entity handlers nested under aggregate root
+        CreateShoplistItem.cs
+        DeleteShoplistItem.cs
+        UpdateShoplistItem.cs
+        UpdateShoplistItemPosition.cs
+        UpdateShoplistItemChecked.cs
 ```
 
 ### Handler File Convention
@@ -241,6 +244,47 @@ public static class CreateList
 - **Split into folder** only when a handler file grows very large (100+ lines in the handler method).
   For typical CRUD, single file is preferred.
 
+### Child Entity Handler Organization
+
+Child entity handlers (e.g., ShoplistItem) live in a subfolder under their aggregate root's feature
+folder: `Features/Shoplists/Items/`. The namespace mirrors the folder structure
+(`Application.Features.Shoplists.Items`). This keeps child entity use cases grouped with their
+aggregate root rather than promoted to a sibling feature folder.
+
+**Handler split strategy for ShoplistItem** — a hybrid approach:
+- **`UpdateShoplistItem`** (`PUT`): entity-level properties (Name, future quantity/price/unit). A
+  single handler that grows as properties are added. Does not include `IsChecked` or `Position`.
+- **`UpdateShoplistItemPosition`** (`PATCH /position`): dedicated handler because reordering mutates
+  sibling items (shifts positions) — different side effects than a simple property change.
+- **`UpdateShoplistItemChecked`** (`PATCH /checked`): dedicated handler because checked state has
+  distinct semantics (client sends desired state for idempotency, not a toggle). Request body is
+  `{ isChecked: bool }`.
+- **`CreateShoplistItem`** (`POST`) and **`DeleteShoplistItem`** (`DELETE`): standard CRUD.
+
+**Aggregate root methods for collection & position management**: Operations that mutate the `_items`
+private collection or coordinate positions across items are methods on `Shoplist` (the aggregate
+root), not inline in handlers. This centralizes position invariant logic:
+- `ShoplistItem AddItem(string name)` — assigns position (max + 1), adds to collection, returns item
+- `void RemoveItem(ShoplistItemId)` — removes from collection, closes position gap. Throws
+  `InvalidOperationException` if item not found (caller should validate first).
+- `bool MoveItem(ShoplistItemId, int newPosition)` — shifts affected range. Returns `false` if
+  position is out of bounds (handler translates to validation error). Throws
+  `InvalidOperationException` if item not found (caller should validate first).
+
+**Error handling convention for domain methods**: Item-not-found is an exceptional situation (the
+handler has already loaded the shoplist with items — if the item isn't there, it's a race condition
+or programming error), so domain methods throw. Position-out-of-range is a business rule validation
+that the handler translates to a user-facing error, so it returns `false`. All handlers find-or-404
+the item via `shoplist.Items.FirstOrDefault(...)` before calling domain methods.
+
+Simple property changes (`Name`, `IsChecked`) are done directly on item references obtained via
+`shoplist.Items.FirstOrDefault(...)` — the returned objects are EF Core tracked entities, so
+property mutations are detected by `SaveChangesAsync`.
+
+**Authorization**: All item handlers load the parent shoplist via
+`CurrentUserShoplists().Include(s => s.Items)`. If the shoplist doesn't belong to the current user,
+it surfaces as NotFound. Items are implicitly scoped through the aggregate root.
+
 ### Logging Philosophy
 
 - Pipeline behaviors handle cross-cutting logging (handler entry/exit, timing, validation failures).
@@ -288,13 +332,17 @@ and tags, then maps individual endpoints within that group.
 **Structure:**
 ```
 Api/
+  Authentication/
+    AuthenticationSettings.cs      -> Settings record (Authority, Audience) bound from config
+    HttpContextCurrentUser.cs      -> ICurrentUser impl, reads "sub" claim from HttpContext
   Endpoints/
     ShoplistEndpoints.cs           -> MapGroup("/shoplists"), maps GET/POST/PUT/DELETE
-    ShoplistItemEndpoints.cs       -> MapGroup("/shoplists/{id}/items"), maps item operations
+    ShoplistItemEndpoints.cs       -> MapGroup("/shoplists/{listId}/items"), maps item CRUD + position/checked
   Extensions/
     EndpointRouteBuilderExtensions.cs -> MapShoplistsApi() — top-level /api prefix group
     ErrorOrExtensions.cs           -> ToHttpResult() extensions for ErrorOr → IResult mapping
   OpenApi/
+    BearerSecuritySchemeTransformer.cs -> Adds Bearer security scheme to OpenAPI doc
     StronglyTypedIdSchemaTransformer.cs -> Makes strongly-typed IDs appear as string/uuid in OpenAPI
 ```
 
@@ -313,6 +361,73 @@ Scalar serves the docs UI at `/scalar/v1` (dev-only). The OpenAPI spec is at `/o
 
 **OpenAPI schema transformers**: `StronglyTypedIdSchemaTransformer` rewrites strongly-typed ID
 schemas. When adding a new ID type, also add it to the transformer's type mapping dictionary.
+
+### Backend Authentication & Authorization
+
+**Approach**: JWT Bearer token validation. The API validates access tokens issued by an external OIDC
+provider. The frontend (Nuxt BFF) handles the OIDC flow, stores tokens server-side in Valkey, and
+attaches the access token as a `Bearer` header when proxying API calls.
+
+**JWT Bearer registration** (`Api/Extensions/DependencyInjection.cs`):
+- `AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(...)` with Authority and
+  Audience from `AuthenticationSettings`.
+- **`MapInboundClaims = false`** — preserves OIDC-standard claim types (`"sub"`, `"name"`, etc.).
+  Without this, ASP.NET Core remaps them to long XML namespace URIs. This means claim lookups use
+  `"sub"` directly, not `ClaimTypes.NameIdentifier`.
+
+**Configuration** (`Api/Authentication/AuthenticationSettings.cs`):
+- `Authority`: OIDC issuer base URL. The JWT handler auto-discovers signing keys at
+  `{Authority}/.well-known/openid-configuration`.
+- `Audience`: Expected `aud` claim in access tokens.
+- Values come from Aspire parameters (`oidc-authority`, `oidc-audience`) injected as environment
+  variables (`Authentication__Authority`, `Authentication__Audience`).
+
+**ICurrentUser implementation** (`Api/Authentication/HttpContextCurrentUser.cs`):
+- Reads the `"sub"` claim from `HttpContext.User` via `IHttpContextAccessor`.
+- Wraps the value in `UserId` (string-backed strongly-typed ID).
+- Throws `InvalidOperationException` if no `sub` claim is present — this is a configuration error
+  since all API endpoints require authentication.
+
+**Authorization strategy**: `.RequireAuthorization()` on the `/api` route group in
+`EndpointRouteBuilderExtensions.MapShoplistsApi()`. This protects all API endpoints while leaving
+OpenAPI, Scalar, and health check endpoints unaffected (they live outside `/api`). We chose this
+over `FallbackPolicy` because all real endpoints are already centralized under `/api`.
+
+**Resource authorization — `CurrentUserShoplists()`**: Resource-level authorization (ensuring users
+can only access their own data) is implemented via a scoped query method on `IAppDbContext`:
+- `IQueryable<Shoplist> CurrentUserShoplists()` — returns only shoplists where
+  `OwnerId == currentUser.UserId`. Implemented in `AppDbContext`, which injects `ICurrentUser`.
+- All **read** operations on shoplists (list, get, update, delete) use `CurrentUserShoplists()`
+  instead of the raw `DbSet`. If a user requests another user's shoplist, it naturally surfaces as
+  `NotFound` — no information leakage about other users' data.
+- **Write** operations (create, remove) use the `Shoplists` DbSet directly — `Add()` and `Remove()`
+  are not query operations.
+- **Convention**: reads go through `CurrentUserShoplists()`, writes go through `Shoplists` DbSet.
+  This is a convention, not enforced by the type system. Code review should verify new handlers
+  follow this pattern.
+- **Aggregate root scoping**: Child entities (e.g., `ShoplistItem`) have no `DbSet` and are only
+  accessible through their parent's navigation property. If the parent Shoplist is scoped by
+  `CurrentUserShoplists()`, items are implicitly scoped too. No additional authorization checks
+  needed for child entities accessed through the aggregate root.
+- **Sharing (future)**: When list sharing is added, the `CurrentUserShoplists()` implementation
+  expands to include shared lists. Callers don't change.
+- **Testing**: Authorization is a first-class testing concern. Integration tests must verify
+  cross-user isolation: User A cannot see, update, or delete User B's lists; `GetShoplists` returns
+  only the current user's data. These tests guard against regressions where a handler accidentally
+  uses the raw `Shoplists` DbSet instead of `CurrentUserShoplists()`.
+
+**`ICurrentUser` in non-API hosts**: `AppDbContext` requires `ICurrentUser` via constructor
+injection. Hosts that don't have an HTTP context (DatabaseMigrator, future background jobs) must
+register a dummy `ICurrentUser` that throws on access — these hosts never execute user-scoped
+queries, but the DI container still needs to resolve the dependency. See `MigrationCurrentUser`
+in the DatabaseMigrator host and `DesignTimeCurrentUser` in `DesignTimeDbContextFactory`.
+
+**OpenAPI security** (`Api/OpenApi/BearerSecuritySchemeTransformer.cs`):
+- `IOpenApiDocumentTransformer` that declares a Bearer security scheme in the OpenAPI document
+  components and sets it as a document-level security requirement.
+- Document-level security means "all operations require this by default" — the standard OpenAPI
+  pattern. Individual operations can override with an empty security array if needed.
+- Makes Scalar show the Bearer token input for authenticated testing.
 
 ### Strongly-Typed Entity IDs
 
@@ -422,6 +537,12 @@ from the configuration code alone.
 - **Indexes** — add explicitly for non-FK properties used in common query patterns (e.g.,
   `OwnerId` for "all lists by user"). EF Core auto-creates indexes for FK columns in configured
   relationships.
+- **`IsImmutableAfterInsert()`** — custom `PropertyBuilder<T>` extension
+  (`Persistence/Extensions/PropertyBuilderExtensions.cs`) that sets
+  `AfterSaveBehavior(PropertySaveBehavior.Throw)`. Apply to non-key properties that must never
+  change after the initial insert (e.g., `OwnerId`, foreign keys to parent aggregates like
+  `ShoplistId` on `ShoplistItem`). Do NOT apply to primary key properties — EF Core already
+  protects those via `ValueGeneratedOnAdd` conventions.
 
 ### Database Migrations
 
@@ -583,6 +704,9 @@ this file updated accordingly.
 | Handler conventions | Static class wrapper, nullable props, primary constructors, internal visibility | **Decided** |
 | Strongly-typed entity IDs | StronglyTypedId source generator, Guid-backed, EF Core converters via `guid-efcore` template | **Decided** |
 | Database migrations | Dedicated DatabaseMigrator worker host, Aspire WaitForCompletion, migrations in Persistence, DesignTimeDbContextFactory for CLI | **Decided** |
+| Backend authentication | JWT Bearer via `Microsoft.AspNetCore.Authentication.JwtBearer`, `MapInboundClaims = false`, `ICurrentUser` reads `"sub"` from HttpContext, group-level `RequireAuthorization()` on `/api` | **Decided** |
+| Resource authorization | `CurrentUserShoplists()` on `IAppDbContext`/`AppDbContext`, scoped by `OwnerId`. Convention: reads via scoped method, writes via raw DbSet. Aggregate root scoping for child entities. `IsImmutableAfterInsert()` for immutable non-key properties. | **Decided** |
+| ShoplistItem endpoint design | Hybrid handler split: `UpdateShoplistItem` (PUT) for entity-level props, `UpdateShoplistItemPosition` (PATCH) and `UpdateShoplistItemChecked` (PATCH) as dedicated handlers. Aggregate root methods on `Shoplist` for collection/position management. Handlers in `Items/` subfolder under `Features/Shoplists/`. | **Decided** |
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |

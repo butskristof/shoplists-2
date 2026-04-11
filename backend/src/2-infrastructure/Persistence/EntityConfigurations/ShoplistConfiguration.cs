@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Shoplists.Domain.Models.Shoplists;
+using Shoplists.Persistence.Extensions;
 
 namespace Shoplists.Persistence.EntityConfigurations;
 
@@ -13,6 +14,7 @@ internal sealed class ShoplistConfiguration : IEntityTypeConfiguration<Shoplist>
 
         builder.Property(sl => sl.Name).IsRequired();
 
+        builder.Property(sl => sl.OwnerId).IsImmutableAfterInsert();
         builder.HasIndex(sl => sl.OwnerId);
 
         builder

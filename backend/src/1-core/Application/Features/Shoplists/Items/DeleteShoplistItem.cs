@@ -6,18 +6,19 @@ using Shoplists.Application.Common.Persistence;
 using Shoplists.Application.Common.Validation;
 using Shoplists.Domain.Models.Shoplists;
 
-namespace Shoplists.Application.Features.Shoplists;
+namespace Shoplists.Application.Features.Shoplists.Items;
 
-public static class UpdateShoplist
+public static class DeleteShoplistItem
 {
-    public sealed record Request(ShoplistId? Id, string? Name) : ICommand<ErrorOr<Success>>;
+    public sealed record Request(ShoplistId? ShoplistId, ShoplistItemId? ItemId)
+        : ICommand<ErrorOr<Success>>;
 
     internal sealed class Validator : BaseValidator<Request>
     {
         public Validator()
         {
-            RuleFor(r => r.Id).NotNullWithErrorCode();
-            RuleFor(r => r.Name).ValidString(required: true);
+            RuleFor(r => r.ShoplistId).NotNullWithErrorCode();
+            RuleFor(r => r.ItemId).NotNullWithErrorCode();
         }
     }
 
@@ -30,16 +31,24 @@ public static class UpdateShoplist
         )
         {
             var shoplist = await dbContext
-                .CurrentUserShoplists()
-                .FirstOrDefaultAsync(s => s.Id == request.Id!.Value, cancellationToken);
+                .CurrentUserShoplists(includeItems: true)
+                .FirstOrDefaultAsync(s => s.Id == request.ShoplistId!.Value, cancellationToken);
 
             if (shoplist is null)
                 return Error.NotFound(description: "Shoplist not found.");
 
-            shoplist.Name = request.Name!;
+            var item = shoplist.Items.FirstOrDefault(i => i.Id == request.ItemId!.Value);
+            if (item is null)
+                return Error.NotFound(description: "Shoplist item not found.");
+
+            shoplist.RemoveItem(item.Id);
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            logger.LogDebug("Updated shoplist {ShoplistId}", shoplist.Id);
+            logger.LogDebug(
+                "Deleted item {ShoplistItemId} from shoplist {ShoplistId}",
+                request.ItemId,
+                shoplist.Id
+            );
 
             return Result.Success;
         }

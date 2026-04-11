@@ -1,3 +1,4 @@
+using Projects;
 using Shoplists.ServiceDefaults.Constants;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -21,18 +22,58 @@ var appDb = postgres.AddDatabase(Resources.AppDb);
 // If the migrator fails, dependent resources remain blocked — the failure is immediately
 // visible in the Aspire dashboard.
 var databaseMigrator = builder
-    .AddProject<Projects.DatabaseMigrator>(Resources.DatabaseMigrator)
+    .AddProject<DatabaseMigrator>(Resources.DatabaseMigrator)
     .WithReference(appDb)
     .WaitFor(appDb);
+
+#endregion
+
+#region OIDC Parameters
+
+var oidcAuthority = builder
+    .AddParameter("oidc-authority")
+    .WithDescription("OIDC issuer base URL (JWT Bearer Authority for the backend API).");
+var oidcAudience = builder
+    .AddParameter("oidc-audience")
+    .WithDescription("Expected audience claim in JWT access tokens.");
+var oidcClientId = builder
+    .AddParameter("oidc-client-id")
+    .WithDescription("OIDC client ID registered with the identity provider.");
+var oidcClientSecret = builder
+    .AddParameter("oidc-client-secret", secret: true)
+    .WithDescription("OIDC client secret provided by identity provider.");
+var oidcOpenIdConfiguration = builder
+    .AddParameter("oidc-openid-configuration")
+    .WithDescription(
+        "URL to the OpenID Connect discovery document (e.g. https://idp.example.com/.well-known/openid-configuration)."
+    );
+var oidcAuthorizationUrl = builder
+    .AddParameter("oidc-authorization-url")
+    .WithDescription("OIDC authorization endpoint URL.");
+var oidcTokenUrl = builder
+    .AddParameter("oidc-token-url")
+    .WithDescription("OIDC token endpoint URL.");
+var oidcUserInfoUrl = builder
+    .AddParameter("oidc-userinfo-url")
+    .WithDescription("OIDC userinfo endpoint URL.");
+var oidcLogoutUrl = builder
+    .AddParameter("oidc-logout-url")
+    .WithDescription("OIDC end session (logout) endpoint URL.");
 
 #endregion
 
 #region API
 
 var api = builder
-    .AddProject<Projects.Api>(Resources.Api)
+    .AddProject<Api>(Resources.Api)
     .WithReference(appDb)
     .WaitForCompletion(databaseMigrator)
+    .WithEnvironment("Authentication__Authority", oidcAuthority)
+    .WithEnvironment("Authentication__Audience", oidcAudience)
+    .WithEnvironment("Authentication__ClientId", oidcClientId)
+    .WithEnvironment("Authentication__ClientSecret", oidcClientSecret)
+    .WithEnvironment("Authentication__AuthorizationUrl", oidcAuthorizationUrl)
+    .WithEnvironment("Authentication__TokenUrl", oidcTokenUrl)
     .WithHttpHealthCheck(HealthCheckConstants.Endpoints.Ready)
     .WithUrlForEndpoint(
         "http",
@@ -70,30 +111,6 @@ var oidcAuthSessionSecret = builder
 var oidcTokenKey = builder
     .AddParameter("oidc-token-key", secret: true)
     .WithDescription("Base64-encoded AES-256-GCM key used to encrypt the server-side token store.");
-
-var oidcClientId = builder
-    .AddParameter("oidc-client-id")
-    .WithDescription("OIDC client ID registered with the identity provider.");
-var oidcClientSecret = builder
-    .AddParameter("oidc-client-secret", secret: true)
-    .WithDescription("OIDC client secret provided by identity provider.");
-var oidcOpenIdConfiguration = builder
-    .AddParameter("oidc-openid-configuration")
-    .WithDescription(
-        "URL to the OpenID Connect discovery document (e.g. https://idp.example.com/.well-known/openid-configuration)."
-    );
-var oidcAuthorizationUrl = builder
-    .AddParameter("oidc-authorization-url")
-    .WithDescription("OIDC authorization endpoint URL.");
-var oidcTokenUrl = builder
-    .AddParameter("oidc-token-url")
-    .WithDescription("OIDC token endpoint URL.");
-var oidcUserInfoUrl = builder
-    .AddParameter("oidc-userinfo-url")
-    .WithDescription("OIDC userinfo endpoint URL.");
-var oidcLogoutUrl = builder
-    .AddParameter("oidc-logout-url")
-    .WithDescription("OIDC end session (logout) endpoint URL.");
 
 var frontend = builder
     .AddJavaScriptApp(name: Resources.Frontend, appDirectory: "../../frontend")

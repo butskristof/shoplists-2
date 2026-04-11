@@ -1,4 +1,3 @@
-using Scalar.AspNetCore;
 using Shoplists.Api.Extensions;
 using Shoplists.Application;
 using Shoplists.Infrastructure;
@@ -10,10 +9,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
+builder.Services.AddConfiguration(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure();
 builder.AddPersistence(Resources.AppDb);
-builder.Services.AddApi();
+builder.Services.AddApi(builder.Configuration);
 
 var app = builder.Build();
 
@@ -32,10 +32,7 @@ app
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi(pattern: "/openapi/{documentName}.json");
-    app.MapOpenApi(pattern: "/openapi/{documentName}.yaml");
-    app.MapOpenApi(pattern: "/openapi/{documentName}.yml");
-    app.MapScalarApiReference();
+    app.MapApiDocumentation();
 }
 
 app.MapShoplistsApi();
