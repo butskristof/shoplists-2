@@ -45,6 +45,9 @@ updates:
         patterns:
           - "Microsoft.EntityFrameworkCore*"
           - "Npgsql.EntityFrameworkCore*"
+      opentelemetry:
+        patterns:
+          - "OpenTelemetry.*"
 
   - package-ecosystem: github-actions
     directory: /
