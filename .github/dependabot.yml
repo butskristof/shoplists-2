@@ -7,6 +7,24 @@ updates:
       day: friday
       time: "18:00"
       timezone: Europe/Brussels
+    groups:
+      primevue:
+        patterns:
+          - "primevue"
+          - "@primevue/*"
+      nuxt:
+        patterns:
+          - "nuxt"
+          - "@nuxt/*"
+          - "nuxt-*"
+      dev-dependencies:
+        dependency-type: development
+        exclude-patterns:
+          - "primevue"
+          - "@primevue/*"
+          - "nuxt"
+          - "@nuxt/*"
+          - "nuxt-*"
 
   - package-ecosystem: nuget
     directory: /backend
@@ -15,6 +33,18 @@ updates:
       day: friday
       time: "18:00"
       timezone: Europe/Brussels
+    groups:
+      aspire:
+        patterns:
+          - "Aspire.*"
+      dotnet-analyzers:
+        patterns:
+          - "Meziantou.Analyzer"
+          - "CSharpier.*"
+      efcore:
+        patterns:
+          - "Microsoft.EntityFrameworkCore*"
+          - "Npgsql.EntityFrameworkCore*"
 
   - package-ecosystem: github-actions
     directory: /
