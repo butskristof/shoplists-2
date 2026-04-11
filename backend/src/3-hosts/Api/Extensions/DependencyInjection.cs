@@ -17,10 +17,9 @@ internal static class DependencyInjection
         /// <returns>The updated IServiceCollection instance for chaining calls.</returns>
         internal IServiceCollection AddConfiguration(IConfiguration configuration)
         {
-            // auth settings are only used once during setup, not necessary to expose them to the runtime
-            // services
-            //     .AddOptions<AuthenticationSettings>()
-            //     .Bind(configuration.GetSection(AuthenticationSettings.SectionName));
+            services
+                .AddOptions<AuthenticationSettings>()
+                .Bind(configuration.GetSection(AuthenticationSettings.SectionName));
 
             return services;
         }
@@ -102,7 +101,8 @@ internal static class DependencyInjection
                 };
 
                 options.AddSchemaTransformer<StronglyTypedIdSchemaTransformer>();
-                options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+                options.AddDocumentTransformer<SecuritySchemeDocumentTransformer>();
+                options.AddOperationTransformer<SecurityOperationTransformer>();
             });
             return services;
         }

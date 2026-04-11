@@ -1,4 +1,3 @@
-using Scalar.AspNetCore;
 using Shoplists.Api.Extensions;
 using Shoplists.Application;
 using Shoplists.Infrastructure;
@@ -33,10 +32,7 @@ app
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi(pattern: "/openapi/{documentName}.json");
-    app.MapOpenApi(pattern: "/openapi/{documentName}.yaml");
-    app.MapOpenApi(pattern: "/openapi/{documentName}.yml");
-    app.MapScalarApiReference();
+    app.MapApiDocumentation();
 }
 
 app.MapShoplistsApi();
