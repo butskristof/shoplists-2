@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <ProjectReference Include="..\..\2-infrastructure\Persistence\Persistence.csproj" />
     <ProjectReference Include="..\..\2-infrastructure\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
