@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
-import { api } from "~/lib/api";
 
 export function useShoplists() {
+  const api = useApi();
+
   const { data, isPending, isError, suspense } = useQuery({
     queryKey: ["shoplists"],
     queryFn: async () => {
@@ -28,7 +29,14 @@ export function useShoplists() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shoplists"] });
+      // `void` is intentional: we fire-and-forget the invalidation so the
+      // mutation settles as soon as the HTTP call succeeds. If we returned
+      // (or awaited) the promise, Vue Query would keep the mutation in its
+      // pending state until the triggered refetch completes — making the UI
+      // feel slower for no benefit here. The refetch still happens in the
+      // background and reconciles the cache shortly after. Same pattern is
+      // applied to every onSuccess in this file.
+      void queryClient.invalidateQueries({ queryKey: ["shoplists"] });
     },
   });
 
@@ -46,6 +54,8 @@ export function useShoplists() {
 }
 
 export function useShoplist(listId: string) {
+  const api = useApi();
+
   const { data, isPending, error, suspense } = useQuery({
     queryKey: ["shoplists", listId],
     queryFn: async () => {
@@ -99,8 +109,8 @@ export function useShoplist(listId: string) {
         throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
-      queryClient.invalidateQueries({ queryKey: ["shoplists"], exact: true });
+      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
+      void queryClient.invalidateQueries({ queryKey: ["shoplists"], exact: true });
     },
   });
 
@@ -128,7 +138,7 @@ export function useShoplist(listId: string) {
         throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
+      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
     },
   });
 
@@ -155,8 +165,8 @@ export function useShoplist(listId: string) {
         throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
-      queryClient.invalidateQueries({ queryKey: ["shoplists"], exact: true });
+      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
+      void queryClient.invalidateQueries({ queryKey: ["shoplists"], exact: true });
     },
   });
 
@@ -184,7 +194,7 @@ export function useShoplist(listId: string) {
         throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
+      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
     },
   });
 
@@ -221,7 +231,7 @@ export function useShoplist(listId: string) {
         throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
+      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
     },
   });
 

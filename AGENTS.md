@@ -40,7 +40,9 @@ See `README.md` for feature ideas.
 - **UI library**: PrimeVue v4 (Aura preset, styled mode with design tokens / CSS variables)
 - **API client generation**: `openapi-fetch` with TypeScript types generated from the backend's
   OpenAPI spec via `npm run generate:api` (`openapi-typescript`) into `app/generated/api.d.ts`.
-  Single client instance at `app/lib/api.ts` with `baseUrl: "/api"` pointing at the BFF proxy.
+  Constructed via the `useApi()` composable in `app/composables/useApi.ts`, which returns an
+  `openapi-fetch` client wired correctly for the current rendering context (SSR vs client). All
+  requests target the BFF proxy at `/api`. See *Frontend BFF & API Client Conventions* below.
 - **Testing**: Use Playwright via MCP tooling during implementation to functionally and visually verify
   changes. No Playwright test code in the repo — testing is done interactively by the agent.
 
@@ -642,22 +644,43 @@ trigger refresh itself. Always call `getUserSession` first.
 
 ### API Client
 
-All API calls go through a single `openapi-fetch` client defined at `app/lib/api.ts`:
+All API calls go through an `openapi-fetch` client constructed by the `useApi()` composable in
+`app/composables/useApi.ts`. The composable returns a client wired correctly for the current
+rendering context — this is necessary because the same call site runs in two very different
+environments:
 
-```ts
-export const api = createClient<paths>({
-  baseUrl: "/api",             // BFF proxy
-  headers: { "x-csrf": "1" },  // required by BFF CSRF check
-});
-```
+- **Client**: relative `baseUrl: "/api"`, browser handles cookies automatically.
+- **Server (SSR / `onServerPrefetch`)**: absolute `baseUrl: "${origin}/api"` (Node's undici fetch
+  rejects relative URLs), and a custom `fetch` wrapper that explicitly forwards the incoming
+  request's `cookie` header so the BFF's `getUserSession` finds the encrypted OIDC session. Without
+  cookie forwarding, the BFF returns 401, the SSR query fails, dehydrate drops the failed query,
+  and the client hydrates empty — producing a hydration mismatch.
+
+The server `fetch` wrapper must seed its `Headers` from the incoming `Request.headers` (not from
+`init.headers`). `openapi-fetch` constructs a `Request` object internally and per the fetch spec,
+`init.headers` *replaces* the Request's headers wholesale — passing a partial header set would
+strip the `x-csrf` header `openapi-fetch` set, and the BFF would return 400.
+
+`useApi()` must be called within a Nuxt setup context (composable, `<script setup>`),
+synchronously and before any top-level `await`, since `useRequestURL` and `useRequestEvent` rely
+on the active component instance.
 
 TypeScript types in `app/generated/api.d.ts` are auto-generated — **do not hand-edit**. Regenerate
 after backend OpenAPI changes with `npm run generate:api` (requires the backend running locally;
 see the script for the hardcoded URL, revisit if Aspire's dynamic ports break this).
 
-Consumers wrap `api` calls in Vue Query `useQuery` / `useMutation` inside composables — see
-`app/composables/useShoplist.ts` for the canonical pattern. On SSR, `onServerPrefetch(() => suspense())`
-ensures the initial render has data.
+Consumers wrap calls in Vue Query `useQuery` / `useMutation` inside composables — see
+`app/composables/useShoplist.ts` for the canonical pattern: call `const api = useApi()` once at
+the top of the composable, then use `api.GET / api.POST / …` from inside query/mutation functions.
+On SSR, `onServerPrefetch(() => suspense())` ensures the initial render has data.
+
+**SSR-safe composable usage in components**: Composables that register `onServerPrefetch` (like
+`useShoplists` / `useShoplist`) must be called synchronously at the top of `<script setup>`, before
+any top-level `await`. `onServerPrefetch` binds to the current component instance, which is only
+reliably tracked during synchronous setup. Getting this wrong fails silently: the page still
+renders, but SSR no longer prefetches — you lose initial-paint data and get a client-side refetch
+instead. When writing new components, call SSR-aware composables first and build subsequent logic
+on their returned refs reactively.
 
 ---
 
@@ -777,7 +800,7 @@ this file updated accordingly.
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
-| API client generation | `openapi-fetch` + `openapi-typescript`, single client at `app/lib/api.ts`, BFF at `/api` | **Decided** |
+| API client generation | `openapi-fetch` + `openapi-typescript`, constructed via `useApi()` composable in `app/composables/useApi.ts` (SSR-aware: absolute URL + cookie forwarding on server, relative URL on client), BFF at `/api` | **Decided** |
 | Frontend BFF & auth | Nitro catch-all proxy at `server/api/[...path].ts`. CSRF via `x-csrf` header, session refresh via `getUserSession`, cookie stripping, manual redirect. Tokens stored encrypted in Valkey, never exposed client-side. | **Decided** |
 | API documentation UI | Scalar (`Scalar.AspNetCore`) at `/scalar/v1`, dev-only. OpenAPI via built-in `Microsoft.AspNetCore.OpenApi` | **Decided** |
 | OpenAPI nullable trade-off | Nullable C# props → nullable TypeScript. Accepted for now; revisit if painful (FluentValidation→OpenAPI schema integration or derived types) | **Accepted (revisit later)** |
