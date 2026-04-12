@@ -23,9 +23,11 @@ See `README.md` for feature ideas.
 ### Frontend
 - **Framework**: Nuxt 4 (Vue 3, TypeScript)
 - **Rendering**: Hybrid — SSR on initial load, hydrating to SPA
-- **BFF**: Implemented in Nuxt (Nitro server routes). The browser authenticates via a secure httpOnly
-  cookie. The BFF extracts the access token from the encrypted cookie and proxies API calls to the
-  backend with the token attached. Token and session management are the BFF's responsibility.
+- **BFF**: Nitro catch-all route at `server/api/[...path].ts` proxies `/api/*` to the backend API.
+  See *Frontend BFF & API Client Conventions* below for the security contract.
+- **Authentication**: `nuxt-oidc-auth` handles the OIDC flow. Access tokens are stored encrypted in
+  Valkey server-side only (`exposeAccessToken: false`, `exposeIdToken: false`) — they never reach
+  the browser.
 - **Language**: TypeScript with strict type safety as a quality goal
 - **Node**: Latest LTS (currently v24)
 - **Package manager**: npm
@@ -36,7 +38,9 @@ See `README.md` for feature ideas.
   - Breakpoints: mobile < 1024px, desktop >= 1024px (`@media (min-width: 1024px)`)
 - **Icons**: PrimeIcons (via `primeicons` npm package, CSS imported in nuxt config)
 - **UI library**: PrimeVue v4 (Aura preset, styled mode with design tokens / CSS variables)
-- **API client generation**: TBD (possibly Nuxt Open Fetch module; decide based on current Nuxt best practices)
+- **API client generation**: `openapi-fetch` with TypeScript types generated from the backend's
+  OpenAPI spec via `npm run generate:api` (`openapi-typescript`) into `app/generated/api.d.ts`.
+  Single client instance at `app/lib/api.ts` with `baseUrl: "/api"` pointing at the BFF proxy.
 - **Testing**: Use Playwright via MCP tooling during implementation to functionally and visually verify
   changes. No Playwright test code in the repo — testing is done interactively by the agent.
 
@@ -594,6 +598,69 @@ checked into source control. The `DatabaseMigrator` host references Persistence 
 
 ---
 
+## Frontend BFF & API Client Conventions
+
+### BFF Proxy
+
+A single Nitro catch-all route (`frontend/server/api/[...path].ts`) proxies all `/api/*` requests to
+the backend. The browser never sees the access token — it stays encrypted in server-side Valkey
+storage.
+
+**Why a BFF at all**: `nuxt-oidc-auth` currently has no way to return the access token server-side
+without also exposing it to the browser via the `UserSession` object. Reading the persistent session
+storage directly in a server-only route keeps the token off the wire to the client.
+
+**Request flow:**
+1. Browser calls `/api/<path>` via the `api` client with an `x-csrf: 1` header.
+2. BFF validates the CSRF header, validates/refreshes the session, extracts the access token.
+3. BFF forwards the request to the backend with `Authorization: Bearer <token>`.
+
+**Security measures (all required, do not remove without discussion):**
+
+1. **CSRF header check** — rejects requests without `x-csrf: 1`. A non-standard header forces a CORS
+   preflight, restricting callers to same-origin (or explicitly allowed origins). Protects against
+   both state-changing CSRF and cross-origin data theft via GET. The `api` client sets this header
+   globally so no per-call plumbing is needed. See https://docs.duendesoftware.com/bff/#csrf-attacks.
+2. **Session lifecycle** — `getUserSession(event)` is called before token extraction. This triggers
+   expiration checks and automatic token refresh per the OIDC config. **Without this call the
+   `automaticRefresh: true` / `expirationCheck: true` config is dead code** — expired tokens would
+   be silently forwarded to the backend.
+3. **Cookie stripping** — outgoing request to the backend sets `cookie: ""`. The backend
+   authenticates via Bearer only; forwarding the session cookie is unnecessary data leakage.
+4. **No redirect following** — `redirect: "manual"` in fetch options. 3xx responses from the
+   backend are passed back to the client instead of being silently followed (e.g. to login pages).
+
+### Session Storage Model
+
+`nuxt-oidc-auth` splits session data across two tiers:
+1. **h3 cookie session** (httpOnly, `sameSite: lax`) — session ID, provider, expiry metadata.
+2. **Persistent session in Valkey** — encrypted access/refresh/id tokens.
+
+`server/utils/auth.ts::getAccessToken()` reads tier 2 via `getUserSessionId()` and decrypts the
+access token. It assumes the session has already been validated by `getUserSession` — it does NOT
+trigger refresh itself. Always call `getUserSession` first.
+
+### API Client
+
+All API calls go through a single `openapi-fetch` client defined at `app/lib/api.ts`:
+
+```ts
+export const api = createClient<paths>({
+  baseUrl: "/api",             // BFF proxy
+  headers: { "x-csrf": "1" },  // required by BFF CSRF check
+});
+```
+
+TypeScript types in `app/generated/api.d.ts` are auto-generated — **do not hand-edit**. Regenerate
+after backend OpenAPI changes with `npm run generate:api` (requires the backend running locally;
+see the script for the hardcoded URL, revisit if Aspire's dynamic ports break this).
+
+Consumers wrap `api` calls in Vue Query `useQuery` / `useMutation` inside composables — see
+`app/composables/useShoplist.ts` for the canonical pattern. On SSR, `onServerPrefetch(() => suspense())`
+ensures the initial render has data.
+
+---
+
 ## Development Practices
 
 ### Documentation-First for Bleeding-Edge Technologies
@@ -710,7 +777,8 @@ this file updated accordingly.
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
-| API client generation | Nuxt Open Fetch or alternative | Not started |
+| API client generation | `openapi-fetch` + `openapi-typescript`, single client at `app/lib/api.ts`, BFF at `/api` | **Decided** |
+| Frontend BFF & auth | Nitro catch-all proxy at `server/api/[...path].ts`. CSRF via `x-csrf` header, session refresh via `getUserSession`, cookie stripping, manual redirect. Tokens stored encrypted in Valkey, never exposed client-side. | **Decided** |
 | API documentation UI | Scalar (`Scalar.AspNetCore`) at `/scalar/v1`, dev-only. OpenAPI via built-in `Microsoft.AspNetCore.OpenApi` | **Decided** |
 | OpenAPI nullable trade-off | Nullable C# props → nullable TypeScript. Accepted for now; revisit if painful (FluentValidation→OpenAPI schema integration or derived types) | **Accepted (revisit later)** |
 | ErrorOr → HTTP mapping | `ToHttpResult()` extensions on `ValueTask<ErrorOr<T>>` and `ErrorOr<T>` in `Api/Extensions/ErrorOrExtensions.cs`. Default Ok, overridable via `onSuccess` param. | **Decided** |
