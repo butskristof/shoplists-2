@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/shoplists": {
+    "/shoplists": {
         parameters: {
             query?: never;
             header?: never;
@@ -20,7 +20,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/shoplists/{id}": {
+    "/shoplists/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -36,7 +36,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/shoplists/{listId}/items": {
+    "/shoplists/{listId}/items": {
         parameters: {
             query?: never;
             header?: never;
@@ -52,7 +52,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/shoplists/{listId}/items/{itemId}": {
+    "/shoplists/{listId}/items/{itemId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -68,7 +68,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/shoplists/{listId}/items/{itemId}/position": {
+    "/shoplists/{listId}/items/{itemId}/position": {
         parameters: {
             query?: never;
             header?: never;
@@ -84,7 +84,7 @@ export interface paths {
         patch: operations["UpdateShoplistItemPosition"];
         trace?: never;
     };
-    "/api/shoplists/{listId}/items/{itemId}/checked": {
+    "/shoplists/{listId}/items/{itemId}/checked": {
         parameters: {
             query?: never;
             header?: never;
@@ -132,6 +132,10 @@ export interface components {
         "GetShoplists.Response": {
             id: components["schemas"]["ShoplistId"];
             name: string;
+            /** Format: int32 */
+            itemCount: number | string;
+            /** Format: int32 */
+            doneCount: number | string;
         };
         HttpValidationProblemDetails: {
             type?: null | string;

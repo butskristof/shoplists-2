@@ -120,6 +120,7 @@ var frontend = builder
     .WaitFor(api);
 
 frontend
+    .WithEnvironment("NUXT_BACKEND_API_URL", api.GetEndpoint("http"))
     .WithEnvironment("NUXT_OIDC_SESSION_SECRET", oidcSessionSecret)
     .WithEnvironment("NUXT_OIDC_AUTH_SESSION_SECRET", oidcAuthSessionSecret)
     .WithEnvironment("NUXT_OIDC_TOKEN_KEY", oidcTokenKey)
@@ -127,11 +128,7 @@ frontend
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_CLIENT_SECRET", oidcClientSecret)
     .WithEnvironment(
         "NUXT_OIDC_PROVIDERS_OIDC_REDIRECT_URI",
-        () =>
-        {
-            var endpoint = frontend.GetEndpoint("http");
-            return $"{endpoint.Url}/auth/oidc/callback";
-        }
+        ReferenceExpression.Create($"{frontend.GetEndpoint("http")}/auth/oidc/callback")
     )
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_OPEN_ID_CONFIGURATION", oidcOpenIdConfiguration)
     .WithEnvironment("NUXT_OIDC_PROVIDERS_OIDC_AUTHORIZATION_URL", oidcAuthorizationUrl)

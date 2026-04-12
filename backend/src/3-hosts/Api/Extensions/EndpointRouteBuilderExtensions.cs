@@ -10,7 +10,7 @@ internal static class EndpointRouteBuilderExtensions
 {
     internal static IEndpointRouteBuilder MapShoplistsApi(this IEndpointRouteBuilder app)
     {
-        var api = app.MapGroup("/api").RequireAuthorization();
+        var api = app.MapGroup("").RequireAuthorization();
 
         api.MapShoplistEndpoints();
         api.MapShoplistItemEndpoints();

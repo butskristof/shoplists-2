@@ -13,4 +13,7 @@ export default withNuxt(
       css: true,
     },
   }),
+  {
+    ignores: ["app/generated/"],
+  },
 );

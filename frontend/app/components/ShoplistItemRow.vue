@@ -172,10 +172,10 @@ function confirmDelete(event: Event) {
     <label
       :for="`item-${item.id}`"
       class="item-row item-row--normal-mode"
-      :class="{ done: item.done }"
+      :class="{ done: item.isChecked }"
     >
       <Checkbox
-        :model-value="item.done"
+        :model-value="item.isChecked"
         :input-id="`item-${item.id}`"
         binary
         size="large"

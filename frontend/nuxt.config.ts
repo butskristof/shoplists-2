@@ -6,6 +6,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
 
   runtimeConfig: {
+    backendApiUrl: "",
     redis: {
       host: "",
       port: 0,

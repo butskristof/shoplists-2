@@ -56,7 +56,7 @@ internal static class ShoplistItemEndpoints
         sender
             .Send(request with { ShoplistId = listId })
             .ToHttpResult(onSuccess: response =>
-                TypedResults.Created($"/api/shoplists/{listId}", response)
+                TypedResults.Created($"/shoplists/{listId}", response)
             );
 
     private static Task<IResult> DeleteShoplistItem(

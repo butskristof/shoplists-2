@@ -54,7 +54,7 @@ internal static class ShoplistEndpoints
         sender
             .Send(request)
             .ToHttpResult(onSuccess: response =>
-                TypedResults.Created($"/api/shoplists/{response.Id}", response)
+                TypedResults.Created($"/shoplists/{response.Id}", response)
             );
 
     private static Task<IResult> UpdateShoplist(

@@ -1,29 +1,30 @@
 /* eslint-disable node/prefer-global/process */
 import type { H3Event } from "h3";
-// @ts-expect-error nuxt-oidc-auth wildcard export not resolved by vue-tsc; .d.ts exists at dist/runtime/server/utils/security.d.ts
+import type { PersistentSession } from "nuxt-oidc-auth/runtime/types.js";
 import { decryptToken } from "nuxt-oidc-auth/runtime/server/utils/security.js";
-
-const SESSION_NAME = "nuxt-oidc-auth";
+import { getUserSessionId } from "nuxt-oidc-auth/runtime/server/utils/session.js";
 
 /**
  * Reads the access token from the OIDC persistent session storage.
- * Tokens are stored encrypted in Valkey by nuxt-oidc-auth.
- * We decrypt server-side for BFF proxying — the token is never exposed to the client
- * (exposeAccessToken is false in the OIDC provider config).
+ *
+ * nuxt-oidc-auth stores session data in two tiers:
+ * 1. An h3 cookie session (session ID, provider, expiry metadata)
+ * 2. A persistent session in Valkey (encrypted tokens: access, refresh, id)
+ *
+ * This function reads tier 2 and decrypts the access token for BFF
+ * proxying. The token is never exposed to the browser (exposeAccessToken
+ * is false in the OIDC provider config).
+ *
+ * **Important**: call `getUserSession(event)` before this function to
+ * ensure the session is valid and tokens have been refreshed if expired.
+ * This function only reads the stored token — it does not trigger refresh.
  */
 export async function getAccessToken(event: H3Event): Promise<string> {
-  const session = await useSession(event, {
-    name: SESSION_NAME,
-    password: process.env.NUXT_OIDC_SESSION_SECRET!,
-  });
+  const sessionId = await getUserSessionId(event);
 
-  if (!session.id || Object.keys(session.data).length === 0) {
-    throw createError({ statusCode: 401, message: "Not authenticated" });
-  }
-
-  const persistentSession = (await useStorage("oidc").getItem(session.id)) as {
-    accessToken?: string;
-  } | null;
+  const persistentSession = (await useStorage("oidc").getItem(
+    sessionId,
+  )) as PersistentSession | null;
   if (!persistentSession?.accessToken) {
     throw createError({
       statusCode: 401,
