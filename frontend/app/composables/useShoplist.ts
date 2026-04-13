@@ -36,7 +36,7 @@ export function useShoplists() {
       // feel slower for no benefit here. The refetch still happens in the
       // background and reconciles the cache shortly after. Same pattern is
       // applied to every onSuccess in this file.
-      void queryClient.invalidateQueries({ queryKey: ["shoplists"] });
+      void queryClient.invalidateQueries({ queryKey: ["shoplists"], exact: true });
     },
   });
 
