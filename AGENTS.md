@@ -619,18 +619,31 @@ storage directly in a server-only route keeps the token off the wire to the clie
 
 **Security measures (all required, do not remove without discussion):**
 
-1. **CSRF header check** — rejects requests without `x-csrf: 1`. A non-standard header forces a CORS
-   preflight, restricting callers to same-origin (or explicitly allowed origins). Protects against
-   both state-changing CSRF and cross-origin data theft via GET. The `api` client sets this header
-   globally so no per-call plumbing is needed. See https://docs.duendesoftware.com/bff/#csrf-attacks.
-2. **Session lifecycle** — `getUserSession(event)` is called before token extraction. This triggers
-   expiration checks and automatic token refresh per the OIDC config. **Without this call the
-   `automaticRefresh: true` / `expirationCheck: true` config is dead code** — expired tokens would
-   be silently forwarded to the backend.
-3. **Cookie stripping** — outgoing request to the backend sets `cookie: ""`. The backend
+1. **CSRF header check** — rejects requests without `x-csrf: 1` with 401 (Duende-aligned). A
+   non-standard header forces a CORS preflight, restricting callers to same-origin (or explicitly
+   allowed origins). Protects against both state-changing CSRF and cross-origin data theft via GET.
+   The `api` client sets this header globally so no per-call plumbing is needed. See
+   https://docs.duendesoftware.com/bff/#csrf-attacks.
+2. **Origin check** — when an `Origin` header is present on the incoming request, it must match
+   `getRequestURL(event).origin`. Active same-origin backstop that does not rely on the absence of
+   CORS headers elsewhere in the stack (e.g. if someone flips `nuxt-security`'s `corsHandler` on
+   later, this check still holds). Same-origin GETs that omit `Origin` entirely are allowed — the
+   check only rejects *mismatched* origins, not missing ones.
+3. **Session lifecycle** — `getUserSession(event)` is called before token extraction, wrapped in
+   try/catch so any failure returns a clean 401. `getUserSession` triggers expiration checks and
+   automatic token refresh per the OIDC config. **Without this call the `automaticRefresh: true` /
+   `expirationCheck: true` config is dead code** — expired tokens would be silently forwarded to
+   the backend.
+4. **Cookie stripping** — outgoing request to the backend sets `cookie: ""`. The backend
    authenticates via Bearer only; forwarding the session cookie is unnecessary data leakage.
-4. **No redirect following** — `redirect: "manual"` in fetch options. 3xx responses from the
+5. **No redirect following** — `redirect: "manual"` in fetch options. 3xx responses from the
    backend are passed back to the client instead of being silently followed (e.g. to login pages).
+
+**CORS is intentionally disabled** (`security.corsHandler: false` in `nuxt.config.ts`). Do not
+enable it without revisiting the CSRF design — if CORS allows a foreign origin to send the
+`x-csrf` header, the preflight-based defense collapses for that origin. The Origin check above is
+an active backstop, but the comment in `nuxt.config.ts` is the first stop for anyone considering
+CORS changes.
 
 ### Session Storage Model
 
@@ -641,6 +654,12 @@ storage directly in a server-only route keeps the token off the wire to the clie
 `server/utils/auth.ts::getAccessToken()` reads tier 2 via `getUserSessionId()` and decrypts the
 access token. It assumes the session has already been validated by `getUserSession` — it does NOT
 trigger refresh itself. Always call `getUserSession` first.
+
+**Startup config validation**: critical runtime config that no other module enforces is validated
+at startup via Nitro plugins — `server/plugins/oidc-storage.ts` checks the Redis connection, and
+`server/plugins/validate-runtime-config.ts` checks `backendApiUrl`. Failing at startup surfaces
+misconfiguration in the Aspire dashboard immediately instead of yielding cryptic per-request
+errors later. When adding new required config, extend the validation plugin.
 
 ### API Client
 

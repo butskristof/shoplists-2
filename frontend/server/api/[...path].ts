@@ -53,8 +53,6 @@ export default defineEventHandler(async (event) => {
   // access token is expired. getUserSession handles expiration checks
   // and refresh-token flows based on the nuxt-oidc-auth configuration.
   // Without this call we could forward expired tokens to the backend.
-  // Wrap in try/catch to return a clean 401 instead of leaking the
-  // library's internal error details (decryption failures, etc.).
   try {
     await getUserSession(event);
   }
