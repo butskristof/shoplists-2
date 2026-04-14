@@ -6,6 +6,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
 
   runtimeConfig: {
+    backendApiUrl: "",
     redis: {
       host: "",
       port: 0,
@@ -17,6 +18,11 @@ export default defineNuxtConfig({
   modules: ["@primevue/nuxt-module", "@nuxt/fonts", "@nuxt/eslint", "@nuxtjs/color-mode", "nuxt-oidc-auth", "nuxt-security"],
 
   security: {
+    // SECURITY: do not enable corsHandler without revisiting the x-csrf
+    // CSRF design in server/api/[...path].ts. If CORS permits any foreign
+    // origin to send the `x-csrf` header, the preflight-based defense is
+    // bypassed from that origin. See also the Origin header check in the
+    // BFF handler, which is an active backstop for this.
     corsHandler: false,
   },
 

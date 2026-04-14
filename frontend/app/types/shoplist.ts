@@ -1,19 +1,5 @@
-export interface ShoplistItem {
-  id: string;
-  name: string;
-  done: boolean;
-  position: number;
-}
+import type { components } from "~/generated/api";
 
-export interface Shoplist {
-  id: string;
-  name: string;
-  items: ShoplistItem[];
-}
-
-export interface ShoplistSummary {
-  id: string;
-  name: string;
-  itemCount: number;
-  doneCount: number;
-}
+export type ShoplistSummary = components["schemas"]["GetShoplists.Response"];
+export type Shoplist = components["schemas"]["GetShoplist.Response"];
+export type ShoplistItem = components["schemas"]["GetShoplist.ItemResponse"];

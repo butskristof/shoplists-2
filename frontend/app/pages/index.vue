@@ -1,7 +1,7 @@
 <script setup lang="ts">
 useHead({ title: "Your lists" });
 
-const { lists } = useShoplists();
+const { lists, isPending, isError } = useShoplists();
 </script>
 
 <template>
@@ -10,7 +10,16 @@ const { lists } = useShoplists();
 
     <AuthInfo />
 
-    <ul v-if="lists.length > 0" class="list">
+    <div v-if="isError" class="error-state">
+      <i class="pi pi-exclamation-circle icon" />
+      <p>Something went wrong loading your lists.</p>
+    </div>
+
+    <div v-else-if="isPending" class="loading-state">
+      <ProgressSpinner />
+    </div>
+
+    <ul v-else-if="lists && lists.length > 0" class="list">
       <li v-for="item in lists" :key="item.id">
         <NuxtLink
           :to="{ name: 'lists-id', params: { id: item.id } }"
@@ -99,6 +108,27 @@ const { lists } = useShoplists();
     flex-shrink: 0;
     font-size: var(--font-size-sm);
   }
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg) var(--spacing-md);
+  text-align: center;
+  color: var(--p-red-500);
+
+  .icon {
+    font-size: var(--font-size-4xl);
+    line-height: var(--font-size-4xl--line-height);
+  }
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-lg) var(--spacing-md);
 }
 
 .empty-state {

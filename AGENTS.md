@@ -23,9 +23,11 @@ See `README.md` for feature ideas.
 ### Frontend
 - **Framework**: Nuxt 4 (Vue 3, TypeScript)
 - **Rendering**: Hybrid — SSR on initial load, hydrating to SPA
-- **BFF**: Implemented in Nuxt (Nitro server routes). The browser authenticates via a secure httpOnly
-  cookie. The BFF extracts the access token from the encrypted cookie and proxies API calls to the
-  backend with the token attached. Token and session management are the BFF's responsibility.
+- **BFF**: Nitro catch-all route at `server/api/[...path].ts` proxies `/api/*` to the backend API.
+  See *Frontend BFF & API Client Conventions* below for the security contract.
+- **Authentication**: `nuxt-oidc-auth` handles the OIDC flow. Access tokens are stored encrypted in
+  Valkey server-side only (`exposeAccessToken: false`, `exposeIdToken: false`) — they never reach
+  the browser.
 - **Language**: TypeScript with strict type safety as a quality goal
 - **Node**: Latest LTS (currently v24)
 - **Package manager**: npm
@@ -36,7 +38,11 @@ See `README.md` for feature ideas.
   - Breakpoints: mobile < 1024px, desktop >= 1024px (`@media (min-width: 1024px)`)
 - **Icons**: PrimeIcons (via `primeicons` npm package, CSS imported in nuxt config)
 - **UI library**: PrimeVue v4 (Aura preset, styled mode with design tokens / CSS variables)
-- **API client generation**: TBD (possibly Nuxt Open Fetch module; decide based on current Nuxt best practices)
+- **API client generation**: `openapi-fetch` with TypeScript types generated from the backend's
+  OpenAPI spec via `npm run generate:api` (`openapi-typescript`) into `app/generated/api.d.ts`.
+  Constructed via the `useApi()` composable in `app/composables/useApi.ts`, which returns an
+  `openapi-fetch` client wired correctly for the current rendering context (SSR vs client). All
+  requests target the BFF proxy at `/api`. See *Frontend BFF & API Client Conventions* below.
 - **Testing**: Use Playwright via MCP tooling during implementation to functionally and visually verify
   changes. No Playwright test code in the repo — testing is done interactively by the agent.
 
@@ -594,6 +600,109 @@ checked into source control. The `DatabaseMigrator` host references Persistence 
 
 ---
 
+## Frontend BFF & API Client Conventions
+
+### BFF Proxy
+
+A single Nitro catch-all route (`frontend/server/api/[...path].ts`) proxies all `/api/*` requests to
+the backend. The browser never sees the access token — it stays encrypted in server-side Valkey
+storage.
+
+**Why a BFF at all**: `nuxt-oidc-auth` currently has no way to return the access token server-side
+without also exposing it to the browser via the `UserSession` object. Reading the persistent session
+storage directly in a server-only route keeps the token off the wire to the client.
+
+**Request flow:**
+1. Browser calls `/api/<path>` via the `api` client with an `x-csrf: 1` header.
+2. BFF validates the CSRF header, validates/refreshes the session, extracts the access token.
+3. BFF forwards the request to the backend with `Authorization: Bearer <token>`.
+
+**Security measures (all required, do not remove without discussion):**
+
+1. **CSRF header check** — rejects requests without `x-csrf: 1` with 401 (Duende-aligned). A
+   non-standard header forces a CORS preflight, restricting callers to same-origin (or explicitly
+   allowed origins). Protects against both state-changing CSRF and cross-origin data theft via GET.
+   The `api` client sets this header globally so no per-call plumbing is needed. See
+   https://docs.duendesoftware.com/bff/#csrf-attacks.
+2. **Origin check** — when an `Origin` header is present on the incoming request, it must match
+   `getRequestURL(event).origin`. Active same-origin backstop that does not rely on the absence of
+   CORS headers elsewhere in the stack (e.g. if someone flips `nuxt-security`'s `corsHandler` on
+   later, this check still holds). Same-origin GETs that omit `Origin` entirely are allowed — the
+   check only rejects *mismatched* origins, not missing ones.
+3. **Session lifecycle** — `getUserSession(event)` is called before token extraction, wrapped in
+   try/catch so any failure returns a clean 401. `getUserSession` triggers expiration checks and
+   automatic token refresh per the OIDC config. **Without this call the `automaticRefresh: true` /
+   `expirationCheck: true` config is dead code** — expired tokens would be silently forwarded to
+   the backend.
+4. **Cookie stripping** — outgoing request to the backend sets `cookie: ""`. The backend
+   authenticates via Bearer only; forwarding the session cookie is unnecessary data leakage.
+5. **No redirect following** — `redirect: "manual"` in fetch options. 3xx responses from the
+   backend are passed back to the client instead of being silently followed (e.g. to login pages).
+
+**CORS is intentionally disabled** (`security.corsHandler: false` in `nuxt.config.ts`). Do not
+enable it without revisiting the CSRF design — if CORS allows a foreign origin to send the
+`x-csrf` header, the preflight-based defense collapses for that origin. The Origin check above is
+an active backstop, but the comment in `nuxt.config.ts` is the first stop for anyone considering
+CORS changes.
+
+### Session Storage Model
+
+`nuxt-oidc-auth` splits session data across two tiers:
+1. **h3 cookie session** (httpOnly, `sameSite: lax`) — session ID, provider, expiry metadata.
+2. **Persistent session in Valkey** — encrypted access/refresh/id tokens.
+
+`server/utils/auth.ts::getAccessToken()` reads tier 2 via `getUserSessionId()` and decrypts the
+access token. It assumes the session has already been validated by `getUserSession` — it does NOT
+trigger refresh itself. Always call `getUserSession` first.
+
+**Startup config validation**: critical runtime config that no other module enforces is validated
+at startup via Nitro plugins — `server/plugins/oidc-storage.ts` checks the Redis connection, and
+`server/plugins/validate-runtime-config.ts` checks `backendApiUrl`. Failing at startup surfaces
+misconfiguration in the Aspire dashboard immediately instead of yielding cryptic per-request
+errors later. When adding new required config, extend the validation plugin.
+
+### API Client
+
+All API calls go through an `openapi-fetch` client constructed by the `useApi()` composable in
+`app/composables/useApi.ts`. The composable returns a client wired correctly for the current
+rendering context — this is necessary because the same call site runs in two very different
+environments:
+
+- **Client**: relative `baseUrl: "/api"`, browser handles cookies automatically.
+- **Server (SSR / `onServerPrefetch`)**: absolute `baseUrl: "${origin}/api"` (Node's undici fetch
+  rejects relative URLs), and a custom `fetch` wrapper that explicitly forwards the incoming
+  request's `cookie` header so the BFF's `getUserSession` finds the encrypted OIDC session. Without
+  cookie forwarding, the BFF returns 401, the SSR query fails, dehydrate drops the failed query,
+  and the client hydrates empty — producing a hydration mismatch.
+
+The server `fetch` wrapper must seed its `Headers` from the incoming `Request.headers` (not from
+`init.headers`). `openapi-fetch` constructs a `Request` object internally and per the fetch spec,
+`init.headers` *replaces* the Request's headers wholesale — passing a partial header set would
+strip the `x-csrf` header `openapi-fetch` set, and the BFF would return 400.
+
+`useApi()` must be called within a Nuxt setup context (composable, `<script setup>`),
+synchronously and before any top-level `await`, since `useRequestURL` and `useRequestEvent` rely
+on the active component instance.
+
+TypeScript types in `app/generated/api.d.ts` are auto-generated — **do not hand-edit**. Regenerate
+after backend OpenAPI changes with `npm run generate:api` (requires the backend running locally;
+see the script for the hardcoded URL, revisit if Aspire's dynamic ports break this).
+
+Consumers wrap calls in Vue Query `useQuery` / `useMutation` inside composables — see
+`app/composables/useShoplist.ts` for the canonical pattern: call `const api = useApi()` once at
+the top of the composable, then use `api.GET / api.POST / …` from inside query/mutation functions.
+On SSR, `onServerPrefetch(() => suspense())` ensures the initial render has data.
+
+**SSR-safe composable usage in components**: Composables that register `onServerPrefetch` (like
+`useShoplists` / `useShoplist`) must be called synchronously at the top of `<script setup>`, before
+any top-level `await`. `onServerPrefetch` binds to the current component instance, which is only
+reliably tracked during synchronous setup. Getting this wrong fails silently: the page still
+renders, but SSR no longer prefetches — you lose initial-paint data and get a client-side refetch
+instead. When writing new components, call SSR-aware composables first and build subsequent logic
+on their returned refs reactively.
+
+---
+
 ## Development Practices
 
 ### Documentation-First for Bleeding-Edge Technologies
@@ -710,7 +819,8 @@ this file updated accordingly.
 | Test framework & setup | Likely TUnit; integration test infrastructure | Not started |
 | UI library | PrimeVue v4 with Aura preset, styled mode | **Decided** |
 | CSS approach details | Scoped native CSS, PrimeVue tokens for colors, 1024px breakpoint | **Decided** |
-| API client generation | Nuxt Open Fetch or alternative | Not started |
+| API client generation | `openapi-fetch` + `openapi-typescript`, constructed via `useApi()` composable in `app/composables/useApi.ts` (SSR-aware: absolute URL + cookie forwarding on server, relative URL on client), BFF at `/api` | **Decided** |
+| Frontend BFF & auth | Nitro catch-all proxy at `server/api/[...path].ts`. CSRF via `x-csrf` header, session refresh via `getUserSession`, cookie stripping, manual redirect. Tokens stored encrypted in Valkey, never exposed client-side. | **Decided** |
 | API documentation UI | Scalar (`Scalar.AspNetCore`) at `/scalar/v1`, dev-only. OpenAPI via built-in `Microsoft.AspNetCore.OpenApi` | **Decided** |
 | OpenAPI nullable trade-off | Nullable C# props → nullable TypeScript. Accepted for now; revisit if painful (FluentValidation→OpenAPI schema integration or derived types) | **Accepted (revisit later)** |
 | ErrorOr → HTTP mapping | `ToHttpResult()` extensions on `ValueTask<ErrorOr<T>>` and `ErrorOr<T>` in `Api/Extensions/ErrorOrExtensions.cs`. Default Ok, overridable via `onSuccess` param. | **Decided** |
