@@ -16,6 +16,7 @@ const {
   addItem,
   deleteItem,
   updateItemName,
+  updateListName,
   reorderItem,
 } = useShoplist(listId);
 
@@ -75,6 +76,54 @@ watch([isEditMode, editList], ([editMode, el]) => {
 function toggleEditMode() {
   isEditMode.value = !isEditMode.value;
 }
+
+// List name editing
+const isEditingName = ref(false);
+const editingName = ref("");
+const nameInputInvalid = ref(false);
+const nameInputRef = useTemplateRef<{ $el: HTMLInputElement }>("nameInputRef");
+
+watch(isEditingName, (editing) => {
+  if (editing) {
+    editingName.value = list.value?.name ?? "";
+    nameInputInvalid.value = false;
+    nextTick(() => nameInputRef.value?.$el?.focus());
+  }
+  else {
+    editingName.value = "";
+    nameInputInvalid.value = false;
+  }
+});
+
+watch(editingName, () => {
+  if (nameInputInvalid.value)
+    nameInputInvalid.value = false;
+});
+
+watch(isEditMode, (editMode) => {
+  if (!editMode)
+    isEditingName.value = false;
+});
+
+function startEditName() {
+  isEditingName.value = true;
+}
+
+function cancelEditName() {
+  isEditingName.value = false;
+}
+
+async function saveName() {
+  const trimmed = editingName.value.trim();
+  if (!trimmed) {
+    nameInputInvalid.value = true;
+    return;
+  }
+  nameInputInvalid.value = false;
+  const success = await updateListName(trimmed);
+  if (success)
+    isEditingName.value = false;
+}
 </script>
 
 <template>
@@ -93,16 +142,62 @@ function toggleEditMode() {
 
     <template v-if="list">
       <div class="list-header">
-        <h1 class="list-name">
+        <InputText
+          v-if="isEditMode && isEditingName"
+          ref="nameInputRef"
+          v-model="editingName"
+          :invalid="nameInputInvalid"
+          fluid
+          class="list-name-input"
+          @keydown.enter="saveName"
+          @keydown.escape="cancelEditName"
+        />
+        <h1 v-else class="list-name">
           {{ list.name }}
         </h1>
         <div class="actions">
-          <Button
-            :icon="isEditMode ? 'pi pi-times' : 'pi pi-pencil'"
-            :aria-label="isEditMode ? 'Exit edit mode' : 'Edit list'"
-            :label="isEditMode ? 'Exit edit mode' : 'Edit list'"
-            @click="toggleEditMode"
-          />
+          <template v-if="isEditMode && isEditingName">
+            <Button
+              v-tooltip.top="'Save'"
+              icon="pi pi-check"
+              rounded
+              variant="text"
+              aria-label="Save list name"
+              @click="saveName"
+            />
+            <Button
+              v-tooltip.top="'Cancel'"
+              icon="pi pi-times"
+              rounded
+              variant="text"
+              severity="secondary"
+              aria-label="Cancel renaming"
+              @click="cancelEditName"
+            />
+          </template>
+          <template v-else-if="isEditMode">
+            <Button
+              v-tooltip.top="'Rename list'"
+              icon="pi pi-pencil"
+              variant="text"
+              aria-label="Rename list"
+              @click="startEditName"
+            />
+            <Button
+              icon="pi pi-times"
+              aria-label="Exit edit mode"
+              label="Exit edit mode"
+              @click="toggleEditMode"
+            />
+          </template>
+          <template v-else>
+            <Button
+              icon="pi pi-pencil"
+              aria-label="Edit list"
+              label="Edit list"
+              @click="toggleEditMode"
+            />
+          </template>
         </div>
       </div>
 
@@ -215,11 +310,25 @@ function toggleEditMode() {
   min-width: 0;
 
   margin-bottom: var(--default-spacing);
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--default-spacing);
+  }
 }
 
 .list-name {
   min-width: 0;
   overflow-wrap: break-word;
+}
+
+.list-name-input {
+  min-width: 200px;
+  flex: 1;
+  font-size: var(--font-size-2xl);
+  line-height: var(--font-size-2xl--line-height);
+  font-weight: var(--weight-bold);
 }
 
 .lists {

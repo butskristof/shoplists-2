@@ -2,13 +2,30 @@
 useHead({ title: "Your lists" });
 
 const { lists, isPending, isError } = useShoplists();
+
+const showCreateDialog = ref(false);
+
+async function handleCreated(id: string) {
+  await navigateTo({ name: "lists-id", params: { id } });
+}
 </script>
 
 <template>
   <div class="list-overview app-container">
-    <h1>Your lists</h1>
+    <div class="page-header">
+      <h1>Your lists</h1>
+      <Button
+        label="New list"
+        icon="pi pi-plus"
+        @click="showCreateDialog = true"
+      />
+    </div>
 
-    <AuthInfo />
+    <CreateShoplistDialog
+      v-if="showCreateDialog"
+      @close="showCreateDialog = false"
+      @created="handleCreated"
+    />
 
     <div v-if="isError" class="error-state">
       <i class="pi pi-exclamation-circle icon" />
@@ -46,6 +63,7 @@ const { lists, isPending, isError } = useShoplists();
       <Button
         label="Create list"
         icon="pi pi-plus"
+        @click="showCreateDialog = true"
       />
     </div>
   </div>
@@ -64,6 +82,14 @@ const { lists, isPending, isError } = useShoplists();
   @media (min-width: 768px) {
     max-width: 720px;
   }
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--default-spacing);
 }
 
 .list {

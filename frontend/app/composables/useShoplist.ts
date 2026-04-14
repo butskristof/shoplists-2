@@ -361,6 +361,52 @@ export function useShoplist(listId: string) {
     }
   }
 
+  // Update list name
+  const updateListNameMutation = useMutation<void, Error, string, OptimisticContext>({
+    mutationFn: async (name: string) => {
+      const { error } = await api.PUT(
+        "/shoplists/{id}",
+        {
+          params: { path: { id: listId } },
+          body: { id: listId, name },
+        },
+      );
+      if (error)
+        throw error;
+    },
+    onMutate: async (name) => {
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previousList = queryClient.getQueryData<Shoplist>(detailKey);
+
+      queryClient.setQueryData<Shoplist>(detailKey, (old) => {
+        if (!old)
+          return old;
+        return { ...old, name };
+      });
+
+      return { previousList };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousList)
+        queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
+      toast.add({ severity: "error", summary: "Failed to rename list", life: 3000 });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: detailKey });
+      void queryClient.invalidateQueries({ queryKey: shoplistKeys.all, exact: true });
+    },
+  });
+
+  async function updateListName(newName: string): Promise<boolean> {
+    try {
+      await updateListNameMutation.mutateAsync(newName);
+      return true;
+    }
+    catch {
+      return false;
+    }
+  }
+
   return {
     list: data,
     isLoading: isPending,
@@ -372,6 +418,7 @@ export function useShoplist(listId: string) {
     addItem,
     deleteItem,
     updateItemName,
+    updateListName,
     reorderItem,
   };
 }
