@@ -281,7 +281,16 @@ Do not rely on training data for API shapes or config patterns.
 - Challenge suggestions when better approaches exist — goal is good engineering, not blind execution
 - Prefer small, incremental changes. Avoid large rewrites unless discussed.
 - When uncertain, ask — do not assume.
-- When making architectural decisions, propose updating this file.
+
+### Keeping this file lean
+
+This file is loaded into context on every interaction — keep it focused on **actionable conventions,
+rules, and patterns** needed for forward development. It is not a decision log or changelog.
+
+When making architectural or tooling decisions, record the rationale in `docs/decisions/NNN-title.md`
+(ADR-lite format: Status, Context, Decision, Alternatives/trade-offs). Only add the resulting
+**convention or rule** to this file — not the reasoning behind it. Read existing records in
+`docs/decisions/` for the format to follow.
 
 ---
 
