@@ -11,7 +11,7 @@ const {
   list,
   sortedItems,
   itemsToGet,
-  doneItems,
+  fulfilledItems,
   toggleItem,
   addItem,
   deleteItem,
@@ -155,12 +155,12 @@ function toggleEditMode() {
             </div>
           </section>
 
-          <section v-if="doneItems.length > 0" class="done-section" aria-label="Done items">
-            <h2 class="done-heading">
-              Done
+          <section v-if="fulfilledItems.length > 0" class="fulfilled-section" aria-label="Fulfilled items">
+            <h2 class="fulfilled-heading">
+              Fulfilled
             </h2>
             <ul class="item-list">
-              <li v-for="item in doneItems" :key="item.id">
+              <li v-for="item in fulfilledItems" :key="item.id">
                 <ShoplistItemRow
                   :item="item"
                   :is-edit-mode="false"
@@ -233,7 +233,7 @@ function toggleEditMode() {
   padding: 0;
 }
 
-.done-heading,
+.fulfilled-heading,
 .todo-heading {
   font-size: var(--font-size-base);
   line-height: var(--font-size-base--line-height);

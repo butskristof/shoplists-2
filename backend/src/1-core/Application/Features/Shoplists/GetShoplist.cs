@@ -14,7 +14,12 @@ public static class GetShoplist
 
     public sealed record Response(ShoplistId Id, string Name, IReadOnlyList<ItemResponse> Items);
 
-    public sealed record ItemResponse(ShoplistItemId Id, string Name, bool IsChecked, int Position);
+    public sealed record ItemResponse(
+        ShoplistItemId Id,
+        string Name,
+        bool IsFulfilled,
+        int Position
+    );
 
     internal sealed class Validator : BaseValidator<Request>
     {
@@ -39,7 +44,7 @@ public static class GetShoplist
                     s.Id,
                     s.Name,
                     s.Items.OrderBy(i => i.Position)
-                        .Select(i => new ItemResponse(i.Id, i.Name, i.IsChecked, i.Position))
+                        .Select(i => new ItemResponse(i.Id, i.Name, i.IsFulfilled, i.Position))
                         .ToList()
                 ))
                 .FirstOrDefaultAsync(cancellationToken);

@@ -79,29 +79,29 @@ export function useShoplist(listId: string) {
   );
 
   const itemsToGet = computed(() =>
-    sortedItems.value.filter(item => !item.isChecked),
+    sortedItems.value.filter(item => !item.isFulfilled),
   );
 
-  const doneItems = computed(() =>
-    sortedItems.value.filter(item => item.isChecked),
+  const fulfilledItems = computed(() =>
+    sortedItems.value.filter(item => item.isFulfilled),
   );
 
   const queryClient = useQueryClient();
 
-  // Toggle checked state
+  // Toggle fulfilled state
   const toggleMutation = useMutation({
     mutationFn: async (itemId: string) => {
       const item = data.value?.items.find(i => i.id === itemId);
       if (!item)
         throw new Error("Item not found");
       const { error } = await api.PATCH(
-        "/shoplists/{listId}/items/{itemId}/checked",
+        "/shoplists/{listId}/items/{itemId}/fulfilled",
         {
           params: { path: { listId, itemId } },
           body: {
             shoplistId: listId,
             itemId,
-            isChecked: !item.isChecked,
+            isFulfilled: !item.isFulfilled,
           },
         },
       );
@@ -257,7 +257,7 @@ export function useShoplist(listId: string) {
     error,
     sortedItems,
     itemsToGet,
-    doneItems,
+    fulfilledItems,
     toggleItem,
     addItem,
     deleteItem,

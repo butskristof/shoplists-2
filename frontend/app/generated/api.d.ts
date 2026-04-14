@@ -84,7 +84,7 @@ export interface paths {
         patch: operations["UpdateShoplistItemPosition"];
         trace?: never;
     };
-    "/shoplists/{listId}/items/{itemId}/checked": {
+    "/shoplists/{listId}/items/{itemId}/fulfilled": {
         parameters: {
             query?: never;
             header?: never;
@@ -97,7 +97,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch: operations["UpdateShoplistItemChecked"];
+        patch: operations["UpdateShoplistItemFulfilled"];
         trace?: never;
     };
 }
@@ -120,7 +120,7 @@ export interface components {
         "GetShoplist.ItemResponse": {
             id: components["schemas"]["ShoplistItemId"];
             name: string;
-            isChecked: boolean;
+            isFulfilled: boolean;
             /** Format: int32 */
             position: number | string;
         };
@@ -132,10 +132,13 @@ export interface components {
         "GetShoplists.Response": {
             id: components["schemas"]["ShoplistId"];
             name: string;
+            items: components["schemas"]["GetShoplists.Response.ItemCounts"];
+        };
+        "GetShoplists.Response.ItemCounts": {
             /** Format: int32 */
-            itemCount: number | string;
+            total: number | string;
             /** Format: int32 */
-            doneCount: number | string;
+            fulfilled: number | string;
         };
         HttpValidationProblemDetails: {
             type?: null | string;
@@ -169,10 +172,10 @@ export interface components {
             itemId: null | components["schemas"]["ShoplistItemId"];
             name: null | string;
         };
-        "UpdateShoplistItemChecked.Request": {
+        "UpdateShoplistItemFulfilled.Request": {
             shoplistId: null | components["schemas"]["ShoplistId"];
             itemId: null | components["schemas"]["ShoplistItemId"];
-            isChecked: null | boolean;
+            isFulfilled: null | boolean;
         };
         "UpdateShoplistItemPosition.Request": {
             shoplistId: null | components["schemas"]["ShoplistId"];
@@ -504,7 +507,7 @@ export interface operations {
             };
         };
     };
-    UpdateShoplistItemChecked: {
+    UpdateShoplistItemFulfilled: {
         parameters: {
             query?: never;
             header?: never;
@@ -516,7 +519,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["UpdateShoplistItemChecked.Request"];
+                "application/json": components["schemas"]["UpdateShoplistItemFulfilled.Request"];
             };
         };
         responses: {

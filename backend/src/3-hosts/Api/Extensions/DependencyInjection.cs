@@ -93,11 +93,19 @@ internal static class DependencyInjection
 
                     // Nested types (e.g. CreateShoplist.Response) get the default ID "Response",
                     // which collides when multiple outer classes define the same nested type name.
-                    // Prefix with the declaring type name to match C# nested type notation.
+                    // Walk the full declaring type chain to produce a unique, fully-qualified ID
+                    // (e.g. "GetShoplists.Response.ItemCounts" instead of just "ItemCounts").
+                    var parts = new List<string>();
                     var declaringType = typeInfo.Type.DeclaringType;
-                    return declaringType is not null
-                        ? $"{declaringType.Name}.{defaultId}"
-                        : defaultId;
+                    while (declaringType is not null)
+                    {
+                        parts.Add(declaringType.Name);
+                        declaringType = declaringType.DeclaringType;
+                    }
+
+                    parts.Reverse();
+                    parts.Add(defaultId);
+                    return string.Join('.', parts);
                 };
 
                 options.AddSchemaTransformer<StronglyTypedIdSchemaTransformer>();

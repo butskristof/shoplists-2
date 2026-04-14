@@ -172,10 +172,10 @@ function confirmDelete(event: Event) {
     <label
       :for="`item-${item.id}`"
       class="item-row item-row--normal-mode"
-      :class="{ done: item.isChecked }"
+      :class="{ fulfilled: item.isFulfilled }"
     >
       <Checkbox
-        :model-value="item.isChecked"
+        :model-value="item.isFulfilled"
         :input-id="`item-${item.id}`"
         binary
         size="large"
@@ -204,7 +204,7 @@ function confirmDelete(event: Event) {
   cursor: pointer;
   user-select: none;
 
-  .done .item-name {
+  .fulfilled .item-name {
     text-decoration: line-through;
     opacity: 0.5;
   }

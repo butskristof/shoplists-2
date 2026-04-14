@@ -6,7 +6,7 @@ public class ShoplistItem
 
     public required string Name { get; set; }
 
-    public bool IsChecked { get; set; } = false;
+    public bool IsFulfilled { get; set; } = false;
 
     public required int Position { get; set; }
 

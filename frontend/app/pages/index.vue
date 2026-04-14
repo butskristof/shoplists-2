@@ -28,8 +28,8 @@ const { lists, isPending, isError } = useShoplists();
           <div class="content">
             <span class="name">{{ item.name }}</span>
             <span class="meta">
-              <template v-if="item.itemCount === 0">No items</template>
-              <template v-else>{{ item.doneCount }}/{{ item.itemCount }} done</template>
+              <template v-if="item.items.total === 0">No items</template>
+              <template v-else>{{ item.items.fulfilled }}/{{ item.items.total }} fulfilled</template>
             </span>
           </div>
           <i class="pi pi-chevron-right chevron" />
