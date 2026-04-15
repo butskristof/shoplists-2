@@ -228,6 +228,25 @@ Key rules:
 - `app/generated/api.d.ts` is auto-generated — **never hand-edit**. Regenerate with
   `npm run generate:api` after any backend contract change.
 
+### Vue Query Patterns
+
+`app/composables/useShoplist.ts` is the reference. Follow these patterns for new data-mutating
+composables:
+
+- **Query-key factory**: export a `<resource>Keys` object (e.g. `shoplistKeys.all`,
+  `shoplistKeys.detail(id)`) and reference it from every `useQuery` / `invalidateQueries` /
+  `setQueryData` call. Do not inline `["resource", …]` arrays.
+- **Optimistic updates by default** for single-resource mutations. Shape:
+  - `onMutate`: `cancelQueries` on affected keys, snapshot previous cache via `getQueryData`, write
+    optimistic state with `setQueryData`, return the snapshot as an `OptimisticContext`.
+  - `onError`: roll back from `context` and surface a PrimeVue toast (`useToast()`) — mutation
+    failures must be visible to the user.
+  - `onSettled`: invalidate the affected keys (detail + list) so the server reconciles.
+  - Type the mutation as `useMutation<TData, Error, TVariables, OptimisticContext>` so `context`
+    is typed in `onError`.
+- Expose mutations through async wrapper functions that return `boolean` (success flag), so pages
+  can branch on the outcome without handling raw errors.
+
 ### Session & Config
 
 - Startup validation: `server/plugins/oidc-storage.ts` (Redis) and
