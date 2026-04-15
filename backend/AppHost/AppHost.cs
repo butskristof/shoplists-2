@@ -116,6 +116,7 @@ var frontend = builder
     .AddJavaScriptApp(name: Resources.Frontend, appDirectory: "../../frontend")
     .WithHttpEndpoint(env: "NITRO_PORT")
     .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health/ready")
     .WaitFor(valkey)
     .WaitFor(api);
 
