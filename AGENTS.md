@@ -11,11 +11,9 @@ See `README.md` for future feature ideas.
 
 ### Frontend
 - **Nuxt 4** (Vue 3, TypeScript), hybrid SSR → SPA
-- **PrimeVue v4** (Aura preset, styled mode with design tokens / CSS variables)
-- **PrimeIcons** for icons
+- **PrimeVue v4** (Aura preset, styled mode with design tokens / CSS variables) and **PrimeIcons** for icons
 - **Native CSS** with nesting, scoped `<style scoped>`. **No Tailwind — non-negotiable.**
   - PrimeVue design tokens (`var(--p-surface-0)`) for all colors (auto light/dark)
-  - Breakpoints: mobile < 1024px, desktop >= 1024px
 - **`openapi-fetch`** with types generated from backend OpenAPI spec (`npm run generate:api`)
 - **`nuxt-oidc-auth`** for OIDC flow; tokens stored encrypted in Valkey, never exposed client-side
 - **Node**: latest LTS (v24), **npm** as package manager
@@ -42,27 +40,26 @@ See `README.md` for future feature ideas.
 ```
 backend/
   Shoplists.slnx
-  AppHost/                         -> Aspire AppHost (orchestrates full stack)
-  Directory.Build.props            -> Shared build config (TFM, analyzers, TreatWarningsAsErrors)
+  AppHost/                   -> Aspire AppHost (orchestrates full stack)
+  Directory.Build.props      -> Shared build config (TFM, analyzers, TreatWarningsAsErrors)
   src/
     1-core/
-      Shoplists.Domain/            -> Entities, value objects, domain logic
-      Shoplists.Application/       -> Use cases, mediator handlers, validation, pipelines
+      Domain/                -> Entities, value objects, domain logic
+      Application/           -> Use cases, mediator handlers, validation, pipelines
     2-infrastructure/
-      Shoplists.Infrastructure/    -> External service integrations (no EF Core)
-      Shoplists.Persistence/       -> EF Core DbContext, configs, migrations
-      ServiceDefaults/             -> Shared Aspire service config
+      Infrastructure/        -> External service integrations (no EF Core)
+      Persistence/           -> EF Core DbContext, configs, migrations
+      ServiceDefaults/       -> Shared Aspire service config
     3-hosts/
-      Shoplists.Api/               -> Minimal API host, endpoints, auth, OpenAPI
-      Shoplists.DatabaseMigrator/  -> Worker service that applies migrations, then exits
-  tests/
-    Shoplists.Domain.UnitTests/
-    Shoplists.Application.UnitTests/
-    Shoplists.Application.IntegrationTests/
-    Shoplists.Tests.Shared/
+      Api/                   -> Minimal API host, endpoints, auth, OpenAPI
+      DatabaseMigrator/      -> Worker service that applies migrations, then exits
+  tests/                     -> (empty; test framework not chosen yet — see Open Decisions)
 frontend/
-  ...                              -> Nuxt application
+  ...                        -> Nuxt application
 ```
+
+Folder names are bare; each project uses `Shoplists.*` as its root namespace
+(e.g. folder `Application/` → namespace `Shoplists.Application`).
 
 **Dependency direction**: 1-core → 2-infrastructure → 3-hosts (numbered folders visualize this).
 AppHost orchestrates hosts but is not part of the layered architecture.
@@ -84,25 +81,31 @@ template for new handlers:
 ```csharp
 public static class CreateShoplist
 {
-    public sealed record Request(string? Name) : ICommand<ErrorOr<Guid>>;
+    public sealed record Request(string? Name) : ICommand<ErrorOr<Response>>;
+
+    public sealed record Response(ShoplistId Id);
 
     internal sealed class Validator : BaseValidator<Request>
     {
         public Validator()
         {
-            RuleFor(r => r.Name).NotNullOrEmptyWithErrorCode();
+            RuleFor(r => r.Name).ValidString(required: true);
         }
     }
 
     internal sealed class Handler(
         ILogger<Handler> logger,
-        IAppDbContext dbContext
-    ) : ICommandHandler<Request, ErrorOr<Guid>>
+        IAppDbContext dbContext,
+        ICurrentUser currentUser
+    ) : ICommandHandler<Request, ErrorOr<Response>>
     {
-        public async ValueTask<ErrorOr<Guid>> Handle(
+        public async ValueTask<ErrorOr<Response>> Handle(
             Request request, CancellationToken cancellationToken)
         {
-            // Implementation
+            var shoplist = new Shoplist { Name = request.Name!, OwnerId = currentUser.UserId };
+            dbContext.Shoplists.Add(shoplist);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return new Response(shoplist.Id);
         }
     }
 }
@@ -110,6 +113,9 @@ public static class CreateShoplist
 
 Key rules:
 - **Request properties are nullable** — FluentValidation enforces non-null (ensures uniform `ValidationProblemDetails`)
+- **`Response` record**: wrap results in a nested `public sealed record Response(...)` rather than
+  returning primitives or domain entities. Queries project into it via `.Select(...)` inside the
+  LINQ query (see `GetShoplists`) so EF translates the projection to SQL.
 - **Validators**: `internal`, inherit `BaseValidator<T>`, validate input *shape* only (non-null, format, range)
 - **Business rule validation** (uniqueness, state transitions, authorization, anything needing DB access) belongs in the **handler** — return `Error.Validation` / `Error.Conflict` / `Error.NotFound` via `ErrorOr`
 - **Handlers**: `internal`, use primary constructors for DI
@@ -119,18 +125,10 @@ Key rules:
 
 ### Application Layer Structure
 
-```
-Application/
-  Common/
-    Authentication/    -> ICurrentUser interface
-    Configuration/     -> Settings DTOs
-    Persistence/       -> IAppDbContext interface
-    Pipeline/          -> Mediator pipeline behaviors (logging, validation)
-    Validation/        -> FluentValidation base classes, extensions, error codes
-  Features/
-    Shoplists/         -> Shoplist handlers
-      Items/           -> ShoplistItem handlers (nested under aggregate root)
-```
+- `Application/Common/` — cross-cutting concerns (auth interfaces, persistence interface, mediator
+  pipelines, validation helpers). Rarely touched during feature work.
+- `Application/Features/<AggregateRoot>/` — one folder per aggregate root, one file per use case.
+  Child-entity handlers nest in a subfolder (e.g. `Features/Shoplists/Items/`).
 
 ### Domain Entity Conventions
 
@@ -167,7 +165,9 @@ private static Task<IResult> GetShoplists(ISender sender) =>
     sender.Send(new GetShoplists.Request()).ToHttpResult();
 ```
 - `MapGroup()` per feature with sub-path and tags
-- Top-level `/api` prefix applied in `MapShoplistsApi()` — features specify only their sub-path
+- `MapShoplistsApi()` registers a root-level group (no path prefix) with `.RequireAuthorization()`;
+  each feature specifies only its sub-path (`/shoplists`, etc.). The `/api` prefix seen from the
+  frontend comes from the BFF proxy, not the backend.
 - `ErrorOr` → HTTP mapping via `ToHttpResult()` extensions (`Api/Extensions/ErrorOrExtensions.cs`).
   Return appropriate `ErrorType` from handlers (`Validation`, `NotFound`, `Conflict`, `Unauthorized`)
   — mapping to status codes is automatic. See ADR 002 for the full mapping table.
@@ -179,7 +179,7 @@ private static Task<IResult> GetShoplists(ISender sender) =>
 
 ### Authorization
 
-- `.RequireAuthorization()` on `/api` group protects all API endpoints
+- `.RequireAuthorization()` on the root group (in `MapShoplistsApi()`) protects all API endpoints
 - **Reads**: Use `dbContext.CurrentUserShoplists()` (scoped to current user's data)
 - **Writes**: Use `dbContext.Shoplists` DbSet directly
 - Child entities are implicitly scoped through aggregate root (load parent via `CurrentUserShoplists().Include(...)`)
@@ -193,11 +193,12 @@ Postgres → DatabaseMigrator (`WaitFor`) → API (`WaitForCompletion`).
 Generate: `cd backend/src/2-infrastructure/Persistence && dotnet ef migrations add <Name>`
 (No `--startup-project` needed — `DesignTimeDbContextFactory` handles it.)
 
-**Do NOT** wrap `MigrateAsync()` in `ExecuteAsync()` or explicit transactions (EF Core 9+ handles both).
-**Do NOT** call `EnsureCreatedAsync()` before `MigrateAsync()`.
+See ADR 005 for runner implementation notes.
 
 ### Other Backend Rules
 
+- **Type accessibility**: New types are `internal sealed` by default. Widen to `public` only when
+  another project needs the type; drop `sealed` only when designed for inheritance.
 - **No `ConfigureAwait(false)`** — no-op on ASP.NET Core / generic host (MA0004 suppressed in `.editorconfig`)
 - **Logging in handlers**: Log state and decisions (entity IDs, branches taken), not action descriptions. Pipeline behaviors handle cross-cutting logging.
 
@@ -207,33 +208,31 @@ Generate: `cd backend/src/2-infrastructure/Persistence && dotnet ef migrations a
 
 ### BFF Proxy
 
-`frontend/server/api/[...path].ts` proxies `/api/*` to the backend. Browser never sees access tokens.
-
-**Security measures — all required, do not remove without discussion:**
-1. **CSRF header**: Requires `x-csrf: 1` (forces CORS preflight → same-origin restriction)
-2. **Origin check**: When present, must match request URL origin
-3. **Session lifecycle**: `getUserSession(event)` called before token extraction (triggers refresh/expiry checks)
-4. **Cookie stripping**: Outgoing requests to backend set `cookie: ""`
-5. **No redirect following**: `redirect: "manual"` in fetch options
-
-**CORS is intentionally disabled** (`security.corsHandler: false`). Do not enable without revisiting CSRF design.
+`frontend/server/api/[...path].ts` proxies `/api/*` to the backend and injects the access token
+server-side — the browser never sees it. The proxy enforces layered same-origin protection (CSRF
+header, origin check, cookie stripping, `redirect: "manual"`, session-lifecycle trigger) and CORS
+is intentionally disabled. See ADR 006 for the full design. Do not weaken any of these without
+review.
 
 ### API Client (`useApi()`)
 
-All API calls use the `openapi-fetch` client from `useApi()` composable (`app/composables/useApi.ts`).
+All API calls go through the `openapi-fetch` client from `useApi()` (`app/composables/useApi.ts`).
+The composable handles client-side vs SSR differences (baseUrl, cookie forwarding) internally —
+see ADR 009 for the mechanism.
 
 Key rules:
-- Call `useApi()` synchronously in setup context, before any `await`
-- **Client-side**: relative `/api` baseUrl, cookies handled by browser
-- **SSR**: absolute URL + cookie forwarding from incoming request (without this → 401 → hydration mismatch)
-- Types in `app/generated/api.d.ts` are auto-generated — **do not hand-edit**. Regenerate with `npm run generate:api`.
-- Wrap calls in Vue Query `useQuery`/`useMutation` in composables (see `app/composables/useShoplist.ts`)
-- SSR-aware composables (`useShoplists`, `useShoplist`) must be called synchronously at top of `<script setup>`, before any `await`
+- Call `useApi()` (and any composable built on it, e.g. `useShoplists`) synchronously at the top of
+  `<script setup>`, before any `await`.
+- Wrap calls in Vue Query `useQuery`/`useMutation` inside dedicated composables (see
+  `app/composables/useShoplist.ts`).
+- `app/generated/api.d.ts` is auto-generated — **never hand-edit**. Regenerate with
+  `npm run generate:api` after any backend contract change.
 
 ### Session & Config
 
-- `server/utils/auth.ts::getAccessToken()` assumes session already validated by `getUserSession` — always call `getUserSession` first
-- Startup validation: `server/plugins/oidc-storage.ts` (Redis) and `server/plugins/validate-runtime-config.ts` (backendApiUrl). Extend these when adding new required config.
+- Startup validation: `server/plugins/oidc-storage.ts` (Redis) and
+  `server/plugins/validate-runtime-config.ts` (backendApiUrl). Extend these when adding new
+  required config.
 
 ### UI Design
 
@@ -309,10 +308,11 @@ Do not rely on training data for API shapes or config patterns.
 
 ### Observability & Debugging
 
-ServiceDefaults wires OpenTelemetry into all .NET services — structured logs, distributed traces,
-and metrics flow into the Aspire dashboard. **Use the Aspire MCP** to inspect them when
-diagnosing issues:
-- Live logs per resource (backend, frontend, migrator, Postgres, Valkey)
+OpenTelemetry is wired into both sides: `ServiceDefaults` covers the .NET services (logs, traces,
+metrics), and `frontend/server/plugins/telemetry.ts` covers the Nitro server (traces + metrics via
+OTLP gRPC; the log export pipeline is scaffolded but Nitro/consola logs are not yet emitted). All
+signals flow into the Aspire dashboard. **Use the Aspire MCP** to inspect:
+- Live logs per .NET resource (backend, migrator, Postgres, Valkey)
 - Distributed traces across the stack (frontend → BFF → backend → DB)
 - Metrics and resource state
 
