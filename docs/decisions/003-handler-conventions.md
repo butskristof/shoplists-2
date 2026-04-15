@@ -34,3 +34,15 @@ generation or use derived "validated" types.
 - `Request` (and `Response` if applicable): **public** — referenced by the API layer
 - `Validator` and `Handler`: **internal** — implementation details
 - Primary constructors for DI, enforced readonly via Meziantou.Analyzer MA0143
+
+### Validator vs handler responsibility split
+
+- **Validator** validates input *shape* only — non-null, format, range, length, regex. Things
+  that can be checked without database access or business context.
+- **Handler** does business rule validation — uniqueness checks, state transition validity,
+  authorization checks, anything requiring DB access or domain knowledge. These return
+  `Error.Validation`, `Error.Conflict`, `Error.NotFound`, etc. via `ErrorOr`.
+
+Putting business rules in the validator is wrong: they require DB access (validators shouldn't
+have DB dependencies), and they conflate "input is malformed" with "request can't be fulfilled
+right now" — different semantic categories.

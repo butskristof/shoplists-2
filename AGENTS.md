@@ -67,6 +67,11 @@ frontend/
 **Dependency direction**: 1-core → 2-infrastructure → 3-hosts (numbered folders visualize this).
 AppHost orchestrates hosts but is not part of the layered architecture.
 
+**Layer constraints** (see ADR 012 for full responsibilities):
+- `Infrastructure` does NOT contain EF Core / database concerns — those live in `Persistence`
+- `AppDbContext` is `internal` — external code uses `IAppDbContext` (defined in Application) or `DatabaseMigrationRunner`
+- `Application` defines interfaces (`IAppDbContext`, `ICurrentUser`); other layers implement them
+
 ---
 
 ## Backend Conventions
@@ -105,7 +110,8 @@ public static class CreateShoplist
 
 Key rules:
 - **Request properties are nullable** — FluentValidation enforces non-null (ensures uniform `ValidationProblemDetails`)
-- **Validators**: `internal`, inherit `BaseValidator<T>`, validate input shape only (not business rules)
+- **Validators**: `internal`, inherit `BaseValidator<T>`, validate input *shape* only (non-null, format, range)
+- **Business rule validation** (uniqueness, state transitions, authorization, anything needing DB access) belongs in the **handler** — return `Error.Validation` / `Error.Conflict` / `Error.NotFound` via `ErrorOr`
 - **Handlers**: `internal`, use primary constructors for DI
 - **Return `ErrorOr<T>`** from all handlers
 - **Single file** unless handler method exceeds ~100 lines
@@ -162,8 +168,14 @@ private static Task<IResult> GetShoplists(ISender sender) =>
 ```
 - `MapGroup()` per feature with sub-path and tags
 - Top-level `/api` prefix applied in `MapShoplistsApi()` — features specify only their sub-path
-- `ErrorOr` → HTTP mapping via `ToHttpResult()` extensions (`Api/Extensions/ErrorOrExtensions.cs`)
+- `ErrorOr` → HTTP mapping via `ToHttpResult()` extensions (`Api/Extensions/ErrorOrExtensions.cs`).
+  Return appropriate `ErrorType` from handlers (`Validation`, `NotFound`, `Conflict`, `Unauthorized`)
+  — mapping to status codes is automatic. See ADR 002 for the full mapping table.
 - Default success: `Ok(value)`. Override via `onSuccess` for `Created` / `NoContent`.
+
+**OpenAPI metadata**: `.WithTags()` on the group, `.WithName()` and `.Produces<T>()` per endpoint.
+- OpenAPI spec: `/openapi/v1.json`
+- Scalar docs UI: `/scalar/v1` (dev-only)
 
 ### Authorization
 
@@ -230,6 +242,22 @@ Key rules:
 
 ---
 
+## API Contract Sync
+
+Backend OpenAPI is the source of truth for API contracts. Frontend types are generated from it.
+
+**Flow when changing the API:**
+1. Update backend handler / endpoint / Request / Response
+2. Run backend (via Aspire) so the OpenAPI spec at `/openapi/v1.json` reflects the changes
+3. From `frontend/`, run `npm run generate:api` — regenerates `app/generated/api.d.ts`
+4. Update frontend code to match the new types (TypeScript will surface breakages)
+5. Run `npm run typecheck` to confirm
+
+`app/generated/api.d.ts` must never be hand-edited. The script's backend URL is hardcoded —
+revisit if Aspire's dynamic ports break it.
+
+---
+
 ## Validation Commands
 
 **Frontend** (run from `frontend/`):
@@ -248,6 +276,11 @@ dotnet format analyzers --verify-no-changes
 ```
 
 All must pass before any task is complete. Do NOT call `npx nuxi`/`npx nuxt` directly.
+
+**Style config to align with:**
+- Frontend: `frontend/.editorconfig`, ESLint config (`@antfu/eslint-config` via `@nuxt/eslint`, no Prettier)
+- Backend: `backend/.editorconfig`, CSharpier defaults, Meziantou.Analyzer rules
+- Follow tooling output — do not override or bypass it
 
 ---
 
@@ -273,6 +306,17 @@ Do not rely on training data for API shapes or config patterns.
 1. Check if Aspire is already running (user typically runs it in Rider) — use Aspire MCP to discover URLs
 2. If not running: `aspire run` from repo root
 3. Last resort: `npm run dev` in frontend dir (rare)
+
+### Observability & Debugging
+
+ServiceDefaults wires OpenTelemetry into all .NET services — structured logs, distributed traces,
+and metrics flow into the Aspire dashboard. **Use the Aspire MCP** to inspect them when
+diagnosing issues:
+- Live logs per resource (backend, frontend, migrator, Postgres, Valkey)
+- Distributed traces across the stack (frontend → BFF → backend → DB)
+- Metrics and resource state
+
+Reach for this before adding ad-hoc logging or guessing at failure modes.
 
 ---
 
