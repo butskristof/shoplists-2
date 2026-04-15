@@ -1,6 +1,9 @@
+import type { components } from "~/generated/api";
 import type { Shoplist } from "~/types/shoplist";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { useToast } from "primevue/usetoast";
+
+type ProblemDetails = components["schemas"]["ProblemDetails"];
 
 export const shoplistKeys = {
   all: ["shoplists"] as const,
@@ -9,6 +12,7 @@ export const shoplistKeys = {
 
 export function useShoplists() {
   const api = useApi();
+  const toast = useToast();
 
   const { data, isPending, isError, suspense } = useQuery({
     queryKey: shoplistKeys.all,
@@ -45,27 +49,31 @@ export function useShoplists() {
       // applied to every onSuccess in this file.
       void queryClient.invalidateQueries({ queryKey: shoplistKeys.all, exact: true });
     },
+    onError: () => {
+      toast.add({ severity: "error", summary: "Failed to create list", life: 3000 });
+    },
   });
 
-  async function createList(name: string): Promise<string | undefined> {
-    try {
-      const result = await createListMutation.mutateAsync(name);
-      return result.id;
-    }
-    catch {
-      return undefined;
-    }
-  }
+  const createList = (name: string) =>
+    createListMutation.mutateAsync(name).then(r => r.id);
 
-  return { lists: data, isPending, isError, createList };
+  return {
+    lists: data,
+    isPending,
+    isError,
+    createList,
+    isCreatingList: createListMutation.isPending,
+  };
 }
 
 export function useShoplist(listId: string) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const api = useApi();
 
   const detailKey = shoplistKeys.detail(listId);
 
-  const { data, isPending, error, suspense } = useQuery({
+  const { data, isPending, isError, error, suspense } = useQuery<Shoplist, ProblemDetails>({
     queryKey: detailKey,
     queryFn: async () => {
       const { data, error } = await api.GET("/shoplists/{id}", {
@@ -76,10 +84,14 @@ export function useShoplist(listId: string) {
       return data;
     },
   });
+  const isNotFound = computed(() => isError.value && Number(error.value?.status) === 404);
 
   onServerPrefetch(async () => {
     await suspense();
   });
+
+  // eslint-disable-next-line style/spaced-comment
+  //#region sorted & filtered items
 
   const sortedItems = computed(() =>
     (data.value?.items ?? []).toSorted(
@@ -95,8 +107,8 @@ export function useShoplist(listId: string) {
     sortedItems.value.filter(item => item.isFulfilled),
   );
 
-  const queryClient = useQueryClient();
-  const toast = useToast();
+  // eslint-disable-next-line style/spaced-comment
+  //#endregion
 
   interface OptimisticContext { previousList: Shoplist | undefined }
 
@@ -141,18 +153,12 @@ export function useShoplist(listId: string) {
     },
   });
 
-  async function toggleItem(itemId: string): Promise<boolean> {
+  const toggleItem = (itemId: string) => {
     const item = data.value?.items.find(i => i.id === itemId);
     if (!item)
-      return false;
-    try {
-      await toggleMutation.mutateAsync({ itemId, isFulfilled: !item.isFulfilled });
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+      throw new Error("Item to toggle not found");
+    toggleMutation.mutate({ itemId, isFulfilled: !item.isFulfilled });
+  };
 
   // Add item
   const addMutation = useMutation({
@@ -170,17 +176,12 @@ export function useShoplist(listId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: detailKey });
     },
+    onError: () => {
+      toast.add({ severity: "error", summary: "Failed to add item", life: 3000 });
+    },
   });
 
-  async function addItem(name: string): Promise<boolean> {
-    try {
-      await addMutation.mutateAsync(name);
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const addItem = (name: string) => void addMutation.mutate(name);
 
   // Delete item
   const deleteMutation = useMutation<void, Error, string, OptimisticContext>({
@@ -209,6 +210,9 @@ export function useShoplist(listId: string) {
 
       return { previousList };
     },
+    onSuccess: () => {
+      toast.add({ severity: "info", summary: "Item removed", life: 2000 });
+    },
     onError: (_err, _vars, context) => {
       if (context?.previousList)
         queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
@@ -220,15 +224,7 @@ export function useShoplist(listId: string) {
     },
   });
 
-  async function deleteItem(itemId: string): Promise<boolean> {
-    try {
-      await deleteMutation.mutateAsync(itemId);
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const deleteItem = (itemId: string) => void deleteMutation.mutate(itemId);
 
   // Update item name
   const updateNameMutation = useMutation<void, Error, { itemId: string; name: string }, OptimisticContext>({
@@ -270,18 +266,8 @@ export function useShoplist(listId: string) {
     },
   });
 
-  async function updateItemName(
-    itemId: string,
-    newName: string,
-  ): Promise<boolean> {
-    try {
-      await updateNameMutation.mutateAsync({ itemId, name: newName });
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const updateItemName = (itemId: string, name: string) =>
+    void updateNameMutation.mutate({ itemId, name });
 
   // Reorder item
   const reorderMutation = useMutation<void, Error, { itemId: string; position: number }, OptimisticContext>({
@@ -345,21 +331,8 @@ export function useShoplist(listId: string) {
     },
   });
 
-  async function reorderItem(
-    itemId: string,
-    newPosition: number,
-  ): Promise<boolean> {
-    try {
-      await reorderMutation.mutateAsync({
-        itemId,
-        position: newPosition,
-      });
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const reorderItem = (itemId: string, position: number) =>
+    void reorderMutation.mutate({ itemId, position });
 
   // Update list name
   const updateListNameMutation = useMutation<void, Error, string, OptimisticContext>({
@@ -386,6 +359,9 @@ export function useShoplist(listId: string) {
 
       return { previousList };
     },
+    onSuccess: () => {
+      toast.add({ severity: "info", summary: "New list name saved", life: 2000 });
+    },
     onError: (_err, _vars, context) => {
       if (context?.previousList)
         queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
@@ -397,19 +373,13 @@ export function useShoplist(listId: string) {
     },
   });
 
-  async function updateListName(newName: string): Promise<boolean> {
-    try {
-      await updateListNameMutation.mutateAsync(newName);
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const updateListName = (name: string) => void updateListNameMutation.mutate(name);
 
   return {
     list: data,
-    isLoading: isPending,
+    isPending,
+    isError,
+    isNotFound,
     error,
     sortedItems,
     itemsToGet,

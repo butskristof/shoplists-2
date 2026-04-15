@@ -4,12 +4,10 @@ const emit = defineEmits<{
   created: [id: string];
 }>();
 
-const { createList } = useShoplists();
-const toast = useToast();
+const { createList, isCreatingList } = useShoplists();
 
 const name = ref("");
 const nameInvalid = ref(false);
-const isCreating = ref(false);
 
 watch(name, () => {
   if (nameInvalid.value)
@@ -18,33 +16,31 @@ watch(name, () => {
 
 async function handleCreate() {
   const trimmed = name.value.trim();
-  if (!trimmed) {
-    nameInvalid.value = true;
+  nameInvalid.value = !trimmed;
+  if (nameInvalid.value) {
     return;
   }
-  nameInvalid.value = false;
-  isCreating.value = true;
+
   const id = await createList(trimmed);
-  isCreating.value = false;
-  if (id) {
-    emit("close");
-    emit("created", id);
-  }
-  else {
-    toast.add({ severity: "error", summary: "Failed to create list", life: 3000 });
-  }
+  emit("close");
+  emit("created", id);
+  // Failure toast is surfaced by the mutation's onError handler.
 }
 </script>
 
 <template>
   <Dialog
     visible
-    header="Create new list"
     modal
+    header="Create new list"
     :style="{ width: '24rem' }"
     @update:visible="emit('close')"
   >
-    <div class="create-dialog-content">
+    <form
+      id="create-list-form"
+      class="create-list-form"
+      @submit.prevent="handleCreate"
+    >
       <label for="new-list-name">Name</label>
       <InputText
         id="new-list-name"
@@ -53,30 +49,39 @@ async function handleCreate() {
         autofocus
         fluid
         placeholder="e.g. Weekly groceries"
-        @keydown.enter="handleCreate"
       />
-    </div>
+    </form>
     <template #footer>
-      <Button
-        label="Cancel"
-        severity="secondary"
-        variant="text"
-        @click="emit('close')"
-      />
-      <Button
-        label="Create"
-        icon="pi pi-plus"
-        :loading="isCreating"
-        @click="handleCreate"
-      />
+      <div class="footer-actions">
+        <Button
+          v-if="!isCreatingList"
+          label="Cancel"
+          severity="secondary"
+          variant="text"
+          @click="emit('close')"
+        />
+        <Button
+          label="Create"
+          icon="pi pi-plus"
+          type="submit"
+          form="create-list-form"
+          :loading="isCreatingList"
+        />
+      </div>
     </template>
   </Dialog>
 </template>
 
 <style scoped>
-.create-dialog-content {
+.create-list-form {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+}
+
+.footer-actions {
+  display: flex;
+  flex-direction: row;
+  gap: var(--default-spacing);
 }
 </style>

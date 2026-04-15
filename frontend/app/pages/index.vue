@@ -2,6 +2,7 @@
 useHead({ title: "Your lists" });
 
 const { lists, isPending, isError } = useShoplists();
+const isEmpty = computed(() => lists.value?.length === 0);
 
 const showCreateDialog = ref(false);
 
@@ -15,6 +16,7 @@ async function handleCreated(id: string) {
     <div class="page-header">
       <h1>Your lists</h1>
       <Button
+        v-if="lists"
         label="New list"
         icon="pi pi-plus"
         @click="showCreateDialog = true"
@@ -27,14 +29,14 @@ async function handleCreated(id: string) {
       @created="handleCreated"
     />
 
-    <div v-if="isError" class="error-state">
-      <i class="pi pi-exclamation-circle icon" />
-      <p>Something went wrong loading your lists.</p>
-    </div>
+    <StatePanel
+      v-if="isError"
+      variant="error"
+      icon="pi pi-exclamation-circle"
+      message="Something went wrong loading your lists."
+    />
 
-    <div v-else-if="isPending" class="loading-state">
-      <ProgressSpinner />
-    </div>
+    <LoadingPanel v-else-if="isPending" />
 
     <ul v-else-if="lists && lists.length > 0" class="list">
       <li v-for="item in lists" :key="item.id">
@@ -54,18 +56,20 @@ async function handleCreated(id: string) {
       </li>
     </ul>
 
-    <div v-else class="empty-state">
-      <i class="pi pi-list icon" />
-      <p>No lists yet</p>
-      <p class="hint">
-        Create a list to start tracking what you need.
-      </p>
-      <Button
-        label="Create list"
-        icon="pi pi-plus"
-        @click="showCreateDialog = true"
-      />
-    </div>
+    <StatePanel
+      v-else-if="isEmpty"
+      icon="pi pi-list"
+      title="No lists yet"
+      message="Create a list to get started"
+    >
+      <template #action>
+        <Button
+          label="Create list"
+          icon="pi pi-plus"
+          @click="showCreateDialog = true"
+        />
+      </template>
+    </StatePanel>
   </div>
 </template>
 
@@ -75,13 +79,6 @@ async function handleCreated(id: string) {
   display: flex;
   flex-direction: column;
   gap: var(--default-spacing);
-
-  @media (min-width: 640px) {
-    max-width: 600px;
-  }
-  @media (min-width: 768px) {
-    max-width: 720px;
-  }
 }
 
 .page-header {
@@ -133,47 +130,7 @@ async function handleCreated(id: string) {
     color: var(--p-surface-400);
     flex-shrink: 0;
     font-size: var(--font-size-sm);
-  }
-}
-
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg) var(--spacing-md);
-  text-align: center;
-  color: var(--p-red-500);
-
-  .icon {
-    font-size: var(--font-size-4xl);
-    line-height: var(--font-size-4xl--line-height);
-  }
-}
-
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding: var(--spacing-lg) var(--spacing-md);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg) var(--spacing-md);
-  text-align: center;
-
-  .icon {
-    font-size: var(--font-size-4xl);
-    line-height: var(--font-size-4xl--line-height);
-  }
-
-  .hint {
-    font-size: var(--font-size-sm);
     line-height: var(--font-size-sm--line-height);
-    margin-bottom: var(--default-spacing);
   }
 }
 
