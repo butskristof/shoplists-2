@@ -1,0 +1,16 @@
+**/.git
+**/.gitignore
+**/.vs
+**/.vscode
+**/.idea
+**/*.*proj.user
+**/*.DotSettings.user
+**/bin
+**/obj
+
+Dockerfile*
+.dockerignore
+
+AppHost/
+tests/
+dotnet-tools.json
