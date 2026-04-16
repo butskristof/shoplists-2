@@ -195,8 +195,8 @@ export function useShoplist(listId: string) {
   const updateItemName = (itemId: string, name: string) =>
     void updateItemNameMutation.mutate({ itemId, name });
 
-  // Reorder item
-  const reorderMutation = useMutation<void, Error, { itemId: string; position: number }, OptimisticContext>({
+  // Update item position
+  const updateItemPositionMutation = useMutation<void, Error, { itemId: string; position: number }, OptimisticContext>({
     mutationFn: async ({ itemId, position }) => {
       const { error } = await api.PATCH(
         "/shoplists/{listId}/items/{itemId}/position",
@@ -250,15 +250,15 @@ export function useShoplist(listId: string) {
     onError: (_err, _vars, context) => {
       if (context?.previousList)
         queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
-      toast.add({ severity: "error", summary: "Failed to reorder item", life: 3000 });
+      toast.add({ severity: "error", summary: "Failed to update item position", life: 3000 });
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: detailKey });
     },
   });
 
-  const reorderItem = (itemId: string, position: number) =>
-    void reorderMutation.mutate({ itemId, position });
+  const updateItemPosition = (itemId: string, position: number) =>
+    void updateItemPositionMutation.mutate({ itemId, position });
 
   // Update list name
   const updateListNameMutation = useMutation<void, Error, string, OptimisticContext>({
@@ -313,6 +313,6 @@ export function useShoplist(listId: string) {
     deleteItem,
     updateItemName,
     updateListName,
-    reorderItem,
+    updateItemPosition,
   };
 }

@@ -11,7 +11,7 @@ const {
   deleteItem,
   updateItemName,
   toggleItem,
-  reorderItem,
+  updateItemPosition,
 } = useShoplist(props.listId);
 
 const isEditMode = useRouteQuery("edit", String(false), {
@@ -39,10 +39,10 @@ function toggleEditMode() {
     <ShoplistEditView
       v-if="isEditMode"
       :items="sortedItems"
-      @add="addItem"
-      @delete="deleteItem"
-      @update:item-name="updateItemName"
-      @reorder="reorderItem"
+      @add-item="addItem"
+      @delete-item="deleteItem"
+      @update-item-name="updateItemName"
+      @update-item-position="updateItemPosition"
     />
     <ShoplistShoppingView
       v-else
