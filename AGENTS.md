@@ -244,8 +244,11 @@ composables:
   - `onSettled`: invalidate the affected keys (detail + list) so the server reconciles.
   - Type the mutation as `useMutation<TData, Error, TVariables, OptimisticContext>` so `context`
     is typed in `onError`.
-- Expose mutations through async wrapper functions that return `boolean` (success flag), so pages
-  can branch on the outcome without handling raw errors.
+- Expose mutations via thin wrappers around `mutateAsync`. Return the response data when callers
+  need it (e.g. `createList` returns the created ID), otherwise return `Promise<void>`. Let errors
+  propagate — the mutation's `onError` handles user-facing feedback (toasts). Callers that need
+  post-success logic (navigation, emits) just `await` and continue; a thrown error naturally
+  prevents subsequent steps from executing.
 
 ### Session & Config
 

@@ -46,7 +46,6 @@ function save() {
   align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-sm) var(--spacing-md);
-  border-bottom: 1px solid var(--p-content-border-color);
 
   .drag-handle-spacer {
     width: 22px;

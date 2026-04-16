@@ -39,7 +39,7 @@ export function useShoplist(listId: string) {
   interface OptimisticContext { previousList: Shoplist | undefined }
 
   // Toggle fulfilled state
-  const toggleMutation = useMutation<void, Error, { itemId: string; isFulfilled: boolean }, OptimisticContext>({
+  const updateItemFulfilledMutation = useMutation<void, Error, { itemId: string; isFulfilled: boolean }, OptimisticContext>({
     mutationFn: async ({ itemId, isFulfilled }) => {
       const { error } = await api.PATCH(
         "/shoplists/{listId}/items/{itemId}/fulfilled",
@@ -79,11 +79,11 @@ export function useShoplist(listId: string) {
     },
   });
 
-  const toggleItem = (itemId: string) => {
+  const toggleItemFulfilled = (itemId: string) => {
     const item = data.value?.items.find(i => i.id === itemId);
     if (!item)
       throw new Error("Item to toggle not found");
-    toggleMutation.mutate({ itemId, isFulfilled: !item.isFulfilled });
+    updateItemFulfilledMutation.mutate({ itemId, isFulfilled: !item.isFulfilled });
   };
 
   // Add item
@@ -301,6 +301,27 @@ export function useShoplist(listId: string) {
 
   const updateListName = (name: string) => void updateListNameMutation.mutate(name);
 
+  // Delete list
+  const deleteListMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await api.DELETE("/shoplists/{id}", {
+        params: { path: { id: listId } },
+      });
+      if (error)
+        throw error;
+    },
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: detailKey });
+      void queryClient.invalidateQueries({ queryKey: shoplistKeys.all, exact: true });
+      toast.add({ severity: "info", summary: "List deleted", life: 3000 });
+    },
+    onError: () => {
+      toast.add({ severity: "error", summary: "Failed to delete list", life: 3000 });
+    },
+  });
+
+  const deleteList = () => deleteListMutation.mutateAsync();
+
   return {
     list: data,
     isPending,
@@ -308,11 +329,13 @@ export function useShoplist(listId: string) {
     isNotFound,
     error,
     sortedItems,
-    toggleItem,
+    toggleItemFulfilled,
     addItem,
     deleteItem,
     updateItemName,
     updateListName,
     updateItemPosition,
+    deleteList,
+    isDeletingList: deleteListMutation.isPending,
   };
 }

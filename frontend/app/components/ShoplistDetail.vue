@@ -10,8 +10,10 @@ const {
   addItem,
   deleteItem,
   updateItemName,
-  toggleItem,
+  toggleItemFulfilled,
   updateItemPosition,
+  deleteList,
+  isDeletingList,
 } = useShoplist(props.listId);
 
 const isEditMode = useRouteQuery("edit", String(false), {
@@ -24,6 +26,13 @@ const isEditMode = useRouteQuery("edit", String(false), {
 
 function enterEditMode() {
   isEditMode.value = true;
+}
+
+const showDeleteDialog = ref(false);
+
+async function handleDeleteList() {
+  await deleteList();
+  await navigateTo("/");
 }
 </script>
 
@@ -47,11 +56,33 @@ function enterEditMode() {
     <ShoplistShoppingView
       v-else
       :items="sortedItems"
-      @toggle-item="toggleItem"
+      @toggle-item="toggleItemFulfilled"
       @enter-edit-mode="enterEditMode"
     />
+
+    <div v-if="isEditMode" class="delete-list">
+      <Button
+        icon="pi pi-trash"
+        label="Delete list"
+        severity="danger"
+        variant="text"
+        @click="showDeleteDialog = true"
+      />
+
+      <DeleteShoplistDialog
+        v-if="showDeleteDialog"
+        :list-name="list!.name"
+        :is-deleting-list="isDeletingList"
+        @close="showDeleteDialog = false"
+        @delete="handleDeleteList"
+      />
+    </div>
   </template>
 </template>
 
 <style scoped>
+.delete-list {
+  display: flex;
+  justify-content: flex-end;
+}
 </style>
