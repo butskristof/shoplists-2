@@ -11,7 +11,10 @@ public static class GetShoplists
 {
     public sealed record Request : IQuery<ErrorOr<IReadOnlyList<Response>>>;
 
-    public sealed record Response(ShoplistId Id, string Name, int ItemCount, int DoneCount);
+    public sealed record Response(ShoplistId Id, string Name, Response.ItemCounts Items)
+    {
+        public sealed record ItemCounts(int Total, int Fulfilled);
+    }
 
     internal sealed class Handler(ILogger<Handler> logger, IAppDbContext dbContext)
         : IQueryHandler<Request, ErrorOr<IReadOnlyList<Response>>>
@@ -26,8 +29,7 @@ public static class GetShoplists
                 .Select(s => new Response(
                     s.Id,
                     s.Name,
-                    s.Items.Count,
-                    s.Items.Count(i => i.IsChecked)
+                    new Response.ItemCounts(s.Items.Count, s.Items.Count(i => i.IsFulfilled))
                 ))
                 .ToListAsync(cancellationToken);
 

@@ -1,27 +1,17 @@
 <script setup lang="ts">
 const colorMode = useColorMode();
 
-const colorModeIcon = computed(() => {
+const colorModeConfig = computed(() => {
   switch (colorMode.preference) {
     case "light":
-      return "pi pi-sun";
+      return { icon: "pi pi-sun", label: "Light mode" };
     case "dark":
-      return "pi pi-moon";
+      return { icon: "pi pi-moon", label: "Dark mode" };
     default:
-      return "pi pi-desktop";
+      return { icon: "pi pi-desktop", label: "System mode" };
   }
 });
 
-const colorModeLabel = computed(() => {
-  switch (colorMode.preference) {
-    case "light":
-      return "Light mode";
-    case "dark":
-      return "Dark mode";
-    default:
-      return "System mode";
-  }
-});
 function cycleColorMode() {
   const modes = ["system", "light", "dark"] as const;
   const currentIndex = modes.indexOf(colorMode.preference as typeof modes[number]);
@@ -31,15 +21,11 @@ function cycleColorMode() {
 
 <template>
   <Button
-    :icon="colorModeIcon"
-    :aria-label="colorModeLabel"
+    :icon="colorModeConfig.icon"
+    :aria-label="colorModeConfig.label"
     text
     rounded
     severity="secondary"
     @click="cycleColorMode"
   />
 </template>
-
-<style scoped>
-
-</style>

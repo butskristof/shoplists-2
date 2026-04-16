@@ -2,22 +2,41 @@
 useHead({ title: "Your lists" });
 
 const { lists, isPending, isError } = useShoplists();
+const hasNoLists = computed(() => lists.value?.length === 0);
+
+const showCreateDialog = ref(false);
+
+async function handleCreated(id: string) {
+  await navigateTo({ name: "lists-id", params: { id } });
+}
 </script>
 
 <template>
   <div class="list-overview app-container">
-    <h1>Your lists</h1>
-
-    <AuthInfo />
-
-    <div v-if="isError" class="error-state">
-      <i class="pi pi-exclamation-circle icon" />
-      <p>Something went wrong loading your lists.</p>
+    <div class="page-header">
+      <h1>Your lists</h1>
+      <Button
+        v-if="lists"
+        label="New list"
+        icon="pi pi-plus"
+        @click="showCreateDialog = true"
+      />
     </div>
 
-    <div v-else-if="isPending" class="loading-state">
-      <ProgressSpinner />
-    </div>
+    <CreateShoplistDialog
+      v-if="showCreateDialog"
+      @close="showCreateDialog = false"
+      @created="handleCreated"
+    />
+
+    <StatePanel
+      v-if="isError"
+      variant="error"
+      icon="pi pi-exclamation-circle"
+      message="Something went wrong loading your lists."
+    />
+
+    <LoadingPanel v-else-if="isPending" />
 
     <ul v-else-if="lists && lists.length > 0" class="list">
       <li v-for="item in lists" :key="item.id">
@@ -28,8 +47,8 @@ const { lists, isPending, isError } = useShoplists();
           <div class="content">
             <span class="name">{{ item.name }}</span>
             <span class="meta">
-              <template v-if="item.itemCount === 0">No items</template>
-              <template v-else>{{ item.doneCount }}/{{ item.itemCount }} done</template>
+              <template v-if="item.items.total === 0">No items</template>
+              <template v-else>{{ item.items.fulfilled }}/{{ item.items.total }} fulfilled</template>
             </span>
           </div>
           <i class="pi pi-chevron-right chevron" />
@@ -37,17 +56,20 @@ const { lists, isPending, isError } = useShoplists();
       </li>
     </ul>
 
-    <div v-else class="empty-state">
-      <i class="pi pi-list icon" />
-      <p>No lists yet</p>
-      <p class="hint">
-        Create a list to start tracking what you need.
-      </p>
-      <Button
-        label="Create list"
-        icon="pi pi-plus"
-      />
-    </div>
+    <StatePanel
+      v-else-if="hasNoLists"
+      icon="pi pi-list"
+      title="No lists yet"
+      message="Create a list to get started"
+    >
+      <template #action>
+        <Button
+          label="Create list"
+          icon="pi pi-plus"
+          @click="showCreateDialog = true"
+        />
+      </template>
+    </StatePanel>
   </div>
 </template>
 
@@ -57,13 +79,14 @@ const { lists, isPending, isError } = useShoplists();
   display: flex;
   flex-direction: column;
   gap: var(--default-spacing);
+}
 
-  @media (min-width: 640px) {
-    max-width: 600px;
-  }
-  @media (min-width: 768px) {
-    max-width: 720px;
-  }
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--default-spacing);
 }
 
 .list {
@@ -90,9 +113,9 @@ const { lists, isPending, isError } = useShoplists();
       font-weight: var(--weight-medium);
       font-size: var(--font-size-lg);
       line-height: var(--font-size-lg--line-height);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      //overflow: hidden;
+      //text-overflow: ellipsis;
+      //white-space: nowrap;
     }
 
     .meta {
@@ -107,47 +130,7 @@ const { lists, isPending, isError } = useShoplists();
     color: var(--p-surface-400);
     flex-shrink: 0;
     font-size: var(--font-size-sm);
-  }
-}
-
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg) var(--spacing-md);
-  text-align: center;
-  color: var(--p-red-500);
-
-  .icon {
-    font-size: var(--font-size-4xl);
-    line-height: var(--font-size-4xl--line-height);
-  }
-}
-
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding: var(--spacing-lg) var(--spacing-md);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg) var(--spacing-md);
-  text-align: center;
-
-  .icon {
-    font-size: var(--font-size-4xl);
-    line-height: var(--font-size-4xl--line-height);
-  }
-
-  .hint {
-    font-size: var(--font-size-sm);
     line-height: var(--font-size-sm--line-height);
-    margin-bottom: var(--default-spacing);
   }
 }
 

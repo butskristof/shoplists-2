@@ -8,9 +8,9 @@ using Shoplists.Domain.Models.Shoplists;
 
 namespace Shoplists.Application.Features.Shoplists.Items;
 
-public static class UpdateShoplistItemChecked
+public static class UpdateShoplistItemFulfilled
 {
-    public sealed record Request(ShoplistId? ShoplistId, ShoplistItemId? ItemId, bool? IsChecked)
+    public sealed record Request(ShoplistId? ShoplistId, ShoplistItemId? ItemId, bool? IsFulfilled)
         : ICommand<ErrorOr<Success>>;
 
     internal sealed class Validator : BaseValidator<Request>
@@ -19,7 +19,7 @@ public static class UpdateShoplistItemChecked
         {
             RuleFor(r => r.ShoplistId).NotNullWithErrorCode();
             RuleFor(r => r.ItemId).NotNullWithErrorCode();
-            RuleFor(r => r.IsChecked).NotNullWithErrorCode();
+            RuleFor(r => r.IsFulfilled).NotNullWithErrorCode();
         }
     }
 
@@ -42,13 +42,13 @@ public static class UpdateShoplistItemChecked
             if (item is null)
                 return Error.NotFound(description: "Shoplist item not found.");
 
-            item.IsChecked = request.IsChecked!.Value;
+            item.IsFulfilled = request.IsFulfilled!.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
 
             logger.LogDebug(
-                "Set item {ShoplistItemId} checked to {IsChecked} in shoplist {ShoplistId}",
+                "Set item {ShoplistItemId} fulfilled to {IsFulfilled} in shoplist {ShoplistId}",
                 item.Id,
-                request.IsChecked,
+                request.IsFulfilled,
                 shoplist.Id
             );
 

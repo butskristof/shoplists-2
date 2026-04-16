@@ -228,6 +228,67 @@ Key rules:
 - `app/generated/api.d.ts` is auto-generated — **never hand-edit**. Regenerate with
   `npm run generate:api` after any backend contract change.
 
+### Vue Query Patterns
+
+`app/composables/useShoplist.ts` is the reference. Follow these patterns for new data-mutating
+composables:
+
+- **Query-key factory**: export a `<resource>Keys` object (e.g. `shoplistKeys.all`,
+  `shoplistKeys.detail(id)`) and reference it from every `useQuery` / `invalidateQueries` /
+  `setQueryData` call. Do not inline `["resource", …]` arrays.
+- **Optimistic updates by default** for single-resource mutations. Shape:
+  - `onMutate`: `cancelQueries` on affected keys, snapshot previous cache via `getQueryData`, write
+    optimistic state with `setQueryData`, return the snapshot as an `OptimisticContext`.
+  - `onError`: roll back from `context` and surface a PrimeVue toast (`useToast()`) — mutation
+    failures must be visible to the user.
+  - `onSettled`: invalidate the affected keys (detail + list) so the server reconciles.
+  - Type the mutation as `useMutation<TData, Error, TVariables, OptimisticContext>` so `context`
+    is typed in `onError`.
+- **Mutation wrappers**: fire-and-forget operations use `.mutate()` and return `void` (e.g.
+  `addItem`, `toggleItemFulfilled`). Use `.mutateAsync()` only when the caller must await the
+  outcome — return response data when needed (e.g. `createList` returns the created ID) or
+  `Promise<void>` for post-success sequencing (navigation, emits). Let errors propagate — the
+  mutation's `onError` handles user-facing feedback (toasts), and a thrown error naturally prevents
+  subsequent steps. Do not wrap in try/catch returning boolean success flags.
+
+### Component Design
+
+- **Pages are thin orchestrators.** Extract route params, call `useHead`, handle top-level
+  loading/error/not-found states, delegate to a child component for the actual feature UI.
+  Pages should not contain business logic, interaction state, or complex templates.
+- **Single responsibility per SFC.** Each component does one thing. If a component renders
+  different UIs based on a mode prop (e.g. `isEditMode`, `isAddRow`), that is two components —
+  split them. Prefer many focused components over one configurable component with many props/modes.
+- **`<script setup>` guideline: ~50 lines.** Not a hard limit, but exceeding it significantly is
+  a signal to extract child components or move logic into a composable.
+- **One composable per resource, one file per composable.** `useShoplists.ts` and `useShoplist.ts`,
+  not combined. Query key factory in its own `queryKeys.ts`.
+- **View-specific derived state belongs in the view component.** Composables provide data +
+  mutations. Filtered/grouped subsets (e.g. `itemsToGet`, `fulfilledItems`) are computed in the
+  component that needs them.
+- **Extract reusable UI primitives on first duplication.** `StatePanel`, `LoadingPanel`,
+  `BackButton` exist — use them. If a new pattern appears twice, extract immediately rather than
+  letting ad-hoc CSS diverge.
+- **Dialogs as components.** Confirmations and forms that appear in a modal (`Dialog`) get their
+  own SFC (e.g. `CreateShoplistDialog`, `DeleteShoplistDialog`). The parent controls visibility
+  via a `v-if` + ref boolean, not inline template.
+
+### Vue Code Style
+
+- **`<form @submit.prevent>` for any submittable input.** Add item, rename, create list — all use
+  forms. This gives Enter-to-submit for free, is semantically correct, and is accessible. Do not
+  use `@keydown.enter` on inputs.
+- **`autofocus` attribute** instead of `nextTick(() => ref.value?.$el?.focus())`.
+- **`computed` over `watch` for derived state.** Validation flags, trimmed values, filtered lists —
+  if it can be expressed as a function of reactive state, use `computed`. Only use `watch` for
+  genuine side effects (API calls, imperative DOM mutations that cannot be declarative).
+- **No `ref` for pure derivations.** `inputInvalid` should be
+  `computed(() => hasAttemptedSave.value && !trimmedName.value)`, not a ref toggled in handlers.
+- **`defineModel` for two-way parent state.** When a child component controls parent state (e.g.
+  edit mode toggle), use `defineModel` + `v-model` rather than prop + emit pairs.
+- **`.mutate()` for fire-and-forget, `.mutateAsync()` only when awaiting** — see Vue Query Patterns
+  above for the full convention.
+
 ### Session & Config
 
 - Startup validation: `server/plugins/oidc-storage.ts` (Redis) and

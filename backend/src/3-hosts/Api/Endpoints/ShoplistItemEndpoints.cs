@@ -39,8 +39,8 @@ internal static class ShoplistItemEndpoints
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         group
-            .MapPatch("/{itemId}/checked", UpdateShoplistItemChecked)
-            .WithName(nameof(UpdateShoplistItemChecked))
+            .MapPatch("/{itemId}/fulfilled", UpdateShoplistItemFulfilled)
+            .WithName(nameof(UpdateShoplistItemFulfilled))
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
@@ -88,11 +88,11 @@ internal static class ShoplistItemEndpoints
             .Send(request with { ShoplistId = listId, ItemId = itemId })
             .ToHttpResult(onSuccess: _ => TypedResults.NoContent());
 
-    private static Task<IResult> UpdateShoplistItemChecked(
+    private static Task<IResult> UpdateShoplistItemFulfilled(
         ISender sender,
         ShoplistId listId,
         ShoplistItemId itemId,
-        UpdateShoplistItemChecked.Request request
+        UpdateShoplistItemFulfilled.Request request
     ) =>
         sender
             .Send(request with { ShoplistId = listId, ItemId = itemId })

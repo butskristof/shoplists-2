@@ -1,63 +1,20 @@
+import type { components } from "~/generated/api";
+import type { Shoplist } from "~/types/shoplist";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import { useToast } from "primevue/usetoast";
+import { shoplistKeys } from "~/composables/queryKeys";
 
-export function useShoplists() {
-  const api = useApi();
-
-  const { data, isPending, isError, suspense } = useQuery({
-    queryKey: ["shoplists"],
-    queryFn: async () => {
-      const { data, error } = await api.GET("/shoplists");
-      if (error)
-        throw error;
-      return data;
-    },
-  });
-
-  onServerPrefetch(async () => {
-    await suspense();
-  });
-
-  const queryClient = useQueryClient();
-
-  const createListMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const { data, error } = await api.POST("/shoplists", {
-        body: { name },
-      });
-      if (error)
-        throw error;
-      return data;
-    },
-    onSuccess: () => {
-      // `void` is intentional: we fire-and-forget the invalidation so the
-      // mutation settles as soon as the HTTP call succeeds. If we returned
-      // (or awaited) the promise, Vue Query would keep the mutation in its
-      // pending state until the triggered refetch completes — making the UI
-      // feel slower for no benefit here. The refetch still happens in the
-      // background and reconciles the cache shortly after. Same pattern is
-      // applied to every onSuccess in this file.
-      void queryClient.invalidateQueries({ queryKey: ["shoplists"], exact: true });
-    },
-  });
-
-  async function createList(name: string): Promise<string | undefined> {
-    try {
-      const result = await createListMutation.mutateAsync(name);
-      return result.id;
-    }
-    catch {
-      return undefined;
-    }
-  }
-
-  return { lists: data, isPending, isError, createList };
-}
+type ProblemDetails = components["schemas"]["ProblemDetails"];
 
 export function useShoplist(listId: string) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
   const api = useApi();
 
-  const { data, isPending, error, suspense } = useQuery({
-    queryKey: ["shoplists", listId],
+  const detailKey = shoplistKeys.detail(listId);
+
+  const { data, isPending, isError, error, suspense } = useQuery<Shoplist, ProblemDetails>({
+    queryKey: detailKey,
     queryFn: async () => {
       const { data, error } = await api.GET("/shoplists/{id}", {
         params: { path: { id: listId } },
@@ -67,6 +24,7 @@ export function useShoplist(listId: string) {
       return data;
     },
   });
+  const isNotFound = computed(() => isError.value && Number(error.value?.status) === 404);
 
   onServerPrefetch(async () => {
     await suspense();
@@ -78,54 +36,58 @@ export function useShoplist(listId: string) {
     ),
   );
 
-  const itemsToGet = computed(() =>
-    sortedItems.value.filter(item => !item.isChecked),
-  );
+  interface OptimisticContext { previousList: Shoplist | undefined }
 
-  const doneItems = computed(() =>
-    sortedItems.value.filter(item => item.isChecked),
-  );
-
-  const queryClient = useQueryClient();
-
-  // Toggle checked state
-  const toggleMutation = useMutation({
-    mutationFn: async (itemId: string) => {
-      const item = data.value?.items.find(i => i.id === itemId);
-      if (!item)
-        throw new Error("Item not found");
+  // Toggle fulfilled state
+  const updateItemFulfilledMutation = useMutation<void, Error, { itemId: string; isFulfilled: boolean }, OptimisticContext>({
+    mutationFn: async ({ itemId, isFulfilled }) => {
       const { error } = await api.PATCH(
-        "/shoplists/{listId}/items/{itemId}/checked",
+        "/shoplists/{listId}/items/{itemId}/fulfilled",
         {
           params: { path: { listId, itemId } },
-          body: {
-            shoplistId: listId,
-            itemId,
-            isChecked: !item.isChecked,
-          },
+          body: { shoplistId: listId, itemId, isFulfilled },
         },
       );
       if (error)
         throw error;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
-      void queryClient.invalidateQueries({ queryKey: ["shoplists"], exact: true });
+    onMutate: async ({ itemId, isFulfilled }) => {
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previousList = queryClient.getQueryData<Shoplist>(detailKey);
+
+      queryClient.setQueryData<Shoplist>(detailKey, (old) => {
+        if (!old)
+          return old;
+        return {
+          ...old,
+          items: old.items.map(item =>
+            item.id === itemId ? { ...item, isFulfilled } : item,
+          ),
+        };
+      });
+
+      return { previousList };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousList)
+        queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
+      toast.add({ severity: "error", summary: "Failed to update item", life: 3000 });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: detailKey });
+      void queryClient.invalidateQueries({ queryKey: shoplistKeys.all, exact: true });
     },
   });
 
-  async function toggleItem(itemId: string): Promise<boolean> {
-    try {
-      await toggleMutation.mutateAsync(itemId);
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const toggleItemFulfilled = (itemId: string) => {
+    const item = data.value?.items.find(i => i.id === itemId);
+    if (!item)
+      throw new Error("Item to toggle not found");
+    updateItemFulfilledMutation.mutate({ itemId, isFulfilled: !item.isFulfilled });
+  };
 
   // Add item
-  const addMutation = useMutation({
+  const addItemMutation = useMutation({
     mutationFn: async (name: string) => {
       const { error } = await api.POST(
         "/shoplists/{listId}/items",
@@ -138,22 +100,17 @@ export function useShoplist(listId: string) {
         throw error;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
+      void queryClient.invalidateQueries({ queryKey: detailKey });
+    },
+    onError: () => {
+      toast.add({ severity: "error", summary: "Failed to add item", life: 3000 });
     },
   });
 
-  async function addItem(name: string): Promise<boolean> {
-    try {
-      await addMutation.mutateAsync(name);
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const addItem = (name: string) => void addItemMutation.mutate(name);
 
   // Delete item
-  const deleteMutation = useMutation({
+  const deleteItemMutation = useMutation<void, Error, string, OptimisticContext>({
     mutationFn: async (itemId: string) => {
       const { error } = await api.DELETE(
         "/shoplists/{listId}/items/{itemId}",
@@ -164,25 +121,40 @@ export function useShoplist(listId: string) {
       if (error)
         throw error;
     },
+    onMutate: async (itemId) => {
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previousList = queryClient.getQueryData<Shoplist>(detailKey);
+
+      queryClient.setQueryData<Shoplist>(detailKey, (old) => {
+        if (!old)
+          return old;
+        return {
+          ...old,
+          items: old.items.filter(item => item.id !== itemId),
+        };
+      });
+
+      return { previousList };
+    },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
-      void queryClient.invalidateQueries({ queryKey: ["shoplists"], exact: true });
+      toast.add({ severity: "info", summary: "Item removed", life: 2000 });
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousList)
+        queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
+      toast.add({ severity: "error", summary: "Failed to delete item", life: 3000 });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: detailKey });
+      void queryClient.invalidateQueries({ queryKey: shoplistKeys.all, exact: true });
     },
   });
 
-  async function deleteItem(itemId: string): Promise<boolean> {
-    try {
-      await deleteMutation.mutateAsync(itemId);
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const deleteItem = (itemId: string) => void deleteItemMutation.mutate(itemId);
 
   // Update item name
-  const updateNameMutation = useMutation({
-    mutationFn: async ({ itemId, name }: { itemId: string; name: string }) => {
+  const updateItemNameMutation = useMutation<void, Error, { itemId: string; name: string }, OptimisticContext>({
+    mutationFn: async ({ itemId, name }) => {
       const { error } = await api.PUT(
         "/shoplists/{listId}/items/{itemId}",
         {
@@ -193,33 +165,39 @@ export function useShoplist(listId: string) {
       if (error)
         throw error;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
+    onMutate: async ({ itemId, name }) => {
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previousList = queryClient.getQueryData<Shoplist>(detailKey);
+
+      queryClient.setQueryData<Shoplist>(detailKey, (old) => {
+        if (!old)
+          return old;
+        return {
+          ...old,
+          items: old.items.map(item =>
+            item.id === itemId ? { ...item, name } : item,
+          ),
+        };
+      });
+
+      return { previousList };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousList)
+        queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
+      toast.add({ severity: "error", summary: "Failed to rename item", life: 3000 });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: detailKey });
     },
   });
 
-  async function updateItemName(
-    itemId: string,
-    newName: string,
-  ): Promise<boolean> {
-    try {
-      await updateNameMutation.mutateAsync({ itemId, name: newName });
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+  const updateItemName = (itemId: string, name: string) =>
+    void updateItemNameMutation.mutate({ itemId, name });
 
-  // Reorder item
-  const reorderMutation = useMutation({
-    mutationFn: async ({
-      itemId,
-      position,
-    }: {
-      itemId: string;
-      position: number;
-    }) => {
+  // Update item position
+  const updateItemPositionMutation = useMutation<void, Error, { itemId: string; position: number }, OptimisticContext>({
+    mutationFn: async ({ itemId, position }) => {
       const { error } = await api.PATCH(
         "/shoplists/{listId}/items/{itemId}/position",
         {
@@ -230,38 +208,134 @@ export function useShoplist(listId: string) {
       if (error)
         throw error;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["shoplists", listId] });
+    onMutate: async ({ itemId, position: newPosition }) => {
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previousList = queryClient.getQueryData<Shoplist>(detailKey);
+
+      queryClient.setQueryData<Shoplist>(detailKey, (old) => {
+        if (!old)
+          return old;
+
+        const movingItem = old.items.find(i => i.id === itemId);
+        if (!movingItem)
+          return old;
+
+        const oldPosition = Number(movingItem.position);
+
+        return {
+          ...old,
+          items: old.items.map((item) => {
+            if (item.id === itemId)
+              return { ...item, position: newPosition };
+
+            const pos = Number(item.position);
+
+            // Moving down (e.g., position 2 -> 5):
+            // Items in (oldPos, newPos] shift up by 1
+            if (oldPosition < newPosition && pos > oldPosition && pos <= newPosition)
+              return { ...item, position: pos - 1 };
+
+            // Moving up (e.g., position 5 -> 2):
+            // Items in [newPos, oldPos) shift down by 1
+            if (oldPosition > newPosition && pos >= newPosition && pos < oldPosition)
+              return { ...item, position: pos + 1 };
+
+            return item;
+          }),
+        };
+      });
+
+      return { previousList };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousList)
+        queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
+      toast.add({ severity: "error", summary: "Failed to update item position", life: 3000 });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: detailKey });
     },
   });
 
-  async function reorderItem(
-    itemId: string,
-    newPosition: number,
-  ): Promise<boolean> {
-    try {
-      await reorderMutation.mutateAsync({
-        itemId,
-        position: newPosition,
+  const updateItemPosition = (itemId: string, position: number) =>
+    void updateItemPositionMutation.mutate({ itemId, position });
+
+  // Update list name
+  const updateListNameMutation = useMutation<void, Error, string, OptimisticContext>({
+    mutationFn: async (name: string) => {
+      const { error } = await api.PUT(
+        "/shoplists/{id}",
+        {
+          params: { path: { id: listId } },
+          body: { id: listId, name },
+        },
+      );
+      if (error)
+        throw error;
+    },
+    onMutate: async (name) => {
+      await queryClient.cancelQueries({ queryKey: detailKey });
+      const previousList = queryClient.getQueryData<Shoplist>(detailKey);
+
+      queryClient.setQueryData<Shoplist>(detailKey, (old) => {
+        if (!old)
+          return old;
+        return { ...old, name };
       });
-      return true;
-    }
-    catch {
-      return false;
-    }
-  }
+
+      return { previousList };
+    },
+    onSuccess: () => {
+      toast.add({ severity: "info", summary: "New list name saved", life: 2000 });
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousList)
+        queryClient.setQueryData<Shoplist>(detailKey, context.previousList);
+      toast.add({ severity: "error", summary: "Failed to rename list", life: 3000 });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: detailKey });
+      void queryClient.invalidateQueries({ queryKey: shoplistKeys.all, exact: true });
+    },
+  });
+
+  const updateListName = (name: string) => void updateListNameMutation.mutate(name);
+
+  // Delete list
+  const deleteListMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await api.DELETE("/shoplists/{id}", {
+        params: { path: { id: listId } },
+      });
+      if (error)
+        throw error;
+    },
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: detailKey });
+      void queryClient.invalidateQueries({ queryKey: shoplistKeys.all, exact: true });
+      toast.add({ severity: "info", summary: "List deleted", life: 3000 });
+    },
+    onError: () => {
+      toast.add({ severity: "error", summary: "Failed to delete list", life: 3000 });
+    },
+  });
+
+  const deleteList = () => deleteListMutation.mutateAsync();
 
   return {
     list: data,
-    isLoading: isPending,
+    isPending,
+    isError,
+    isNotFound,
     error,
     sortedItems,
-    itemsToGet,
-    doneItems,
-    toggleItem,
+    toggleItemFulfilled,
     addItem,
     deleteItem,
     updateItemName,
-    reorderItem,
+    updateListName,
+    updateItemPosition,
+    deleteList,
+    isDeletingList: deleteListMutation.isPending,
   };
 }
