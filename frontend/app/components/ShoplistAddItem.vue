@@ -4,48 +4,40 @@ const emit = defineEmits<{
 }>();
 
 const editingName = ref("");
-const inputInvalid = ref(false);
-const inputRef = useTemplateRef<{ $el: HTMLInputElement }>("inputRef");
-
-watch(editingName, () => {
-  if (inputInvalid.value)
-    inputInvalid.value = false;
-});
+const hasAttemptedSave = ref(false);
+const trimmedName = computed(() => editingName.value.trim());
+const inputInvalid = computed(() => hasAttemptedSave.value && !trimmedName.value);
 
 function save() {
-  const trimmed = editingName.value.trim();
-  if (!trimmed) {
-    inputInvalid.value = true;
+  hasAttemptedSave.value = true;
+  if (!trimmedName.value)
     return;
-  }
-  emit("add", trimmed);
+  emit("add", trimmedName.value);
   editingName.value = "";
-  nextTick(() => inputRef.value?.$el?.focus());
+  hasAttemptedSave.value = false;
 }
 </script>
 
 <template>
-  <div class="item-row">
+  <form class="item-row" @submit.prevent="save">
     <span class="drag-handle-spacer" aria-hidden="true" />
     <InputText
-      ref="inputRef"
       v-model="editingName"
       placeholder="Add a new item..."
       :invalid="inputInvalid"
       fluid
-      @keydown.enter="save"
     />
     <div class="actions">
       <Button
         v-tooltip.top="'Add item'"
+        type="submit"
         icon="pi pi-plus"
         rounded
         variant="text"
         aria-label="Add item"
-        @click="save"
       />
     </div>
-  </div>
+  </form>
 </template>
 
 <style scoped>

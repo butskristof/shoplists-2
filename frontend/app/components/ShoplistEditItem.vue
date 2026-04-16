@@ -15,33 +15,18 @@ const confirm = useConfirm();
 
 const isEditing = ref(false);
 const editingName = ref("");
-const inputInvalid = ref(false);
-const inputRef = useTemplateRef<{ $el: HTMLInputElement }>("inputRef");
+const trimmedName = computed(() => editingName.value.trim());
+const inputInvalid = computed(() => !trimmedName.value);
 
-watch(isEditing, (editing) => {
-  if (editing) {
-    editingName.value = props.item.name;
-    inputInvalid.value = false;
-    nextTick(() => inputRef.value?.$el?.focus());
-  }
-  else {
-    editingName.value = "";
-    inputInvalid.value = false;
-  }
-});
-
-watch(editingName, () => {
-  if (inputInvalid.value)
-    inputInvalid.value = false;
-});
+function startEditing() {
+  editingName.value = props.item.name;
+  isEditing.value = true;
+}
 
 function save() {
-  const trimmed = editingName.value.trim();
-  if (!trimmed) {
-    inputInvalid.value = true;
+  if (!trimmedName.value)
     return;
-  }
-  emit("update:name", trimmed);
+  emit("update:name", trimmedName.value);
   isEditing.value = false;
 }
 
@@ -59,28 +44,27 @@ function confirmDelete(event: Event) {
 <template>
   <div
     class="item-row"
-    :class="{ 'item-row--editing': isEditing }"
+    :class="{ editing: isEditing }"
   >
     <span class="drag-handle" aria-hidden="true" title="Drag to reorder">
       <i class="pi pi-ellipsis-v" />
     </span>
-    <template v-if="isEditing">
+    <form v-if="isEditing" class="edit-form" @submit.prevent="save">
       <InputText
-        ref="inputRef"
         v-model="editingName"
         :invalid="inputInvalid"
+        autofocus
         fluid
-        @keydown.enter="save"
         @keydown.escape="isEditing = false"
       />
       <div class="actions">
         <Button
           v-tooltip.top="'Save'"
+          type="submit"
           icon="pi pi-check"
           rounded
           variant="text"
           aria-label="Save"
-          @click="save"
         />
         <Button
           v-tooltip.top="'Cancel'"
@@ -92,7 +76,7 @@ function confirmDelete(event: Event) {
           @click="isEditing = false"
         />
       </div>
-    </template>
+    </form>
     <template v-else>
       <span class="item-name">{{ item.name }}</span>
       <div class="actions">
@@ -102,7 +86,7 @@ function confirmDelete(event: Event) {
           rounded
           variant="text"
           aria-label="Rename item"
-          @click="isEditing = true"
+          @click="startEditing"
         />
         <Button
           v-tooltip.top="'Delete'"
@@ -126,7 +110,15 @@ function confirmDelete(event: Event) {
   padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid var(--p-content-border-color);
 
-  &:not(.item-row--editing) {
+  .edit-form {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
+    min-width: 0;
+  }
+
+  &:not(.editing) {
     .item-name {
       min-width: 0;
       overflow-wrap: break-word;
@@ -167,7 +159,7 @@ function confirmDelete(event: Event) {
 }
 
 @media (hover: hover) {
-  .item-row:not(.item-row--editing):hover {
+  .item-row:not(.editing):hover {
     background: var(--p-content-hover-background);
   }
 }
