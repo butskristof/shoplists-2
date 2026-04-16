@@ -22,8 +22,8 @@ const isEditMode = useRouteQuery("edit", String(false), {
   mode: "replace",
 });
 
-function toggleEditMode() {
-  isEditMode.value = !isEditMode.value;
+function enterEditMode() {
+  isEditMode.value = true;
 }
 </script>
 
@@ -48,7 +48,7 @@ function toggleEditMode() {
       v-else
       :items="sortedItems"
       @toggle-item="toggleItem"
-      @enter-edit-mode="toggleEditMode"
+      @enter-edit-mode="enterEditMode"
     />
   </template>
 </template>

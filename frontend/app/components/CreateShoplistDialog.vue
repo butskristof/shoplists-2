@@ -7,21 +7,16 @@ const emit = defineEmits<{
 const { createList, isCreatingList } = useShoplists();
 
 const name = ref("");
-const nameInvalid = ref(false);
-
-watch(name, () => {
-  if (nameInvalid.value)
-    nameInvalid.value = false;
-});
+const hasAttemptedCreate = ref(false);
+const trimmedName = computed(() => name.value.trim());
+const nameInvalid = computed(() => hasAttemptedCreate.value && !trimmedName.value);
 
 async function handleCreate() {
-  const trimmed = name.value.trim();
-  nameInvalid.value = !trimmed;
-  if (nameInvalid.value) {
+  hasAttemptedCreate.value = true;
+  if (!trimmedName.value)
     return;
-  }
 
-  const id = await createList(trimmed);
+  const id = await createList(trimmedName.value);
   emit("close");
   emit("created", id);
   // Failure toast is surfaced by the mutation's onError handler.

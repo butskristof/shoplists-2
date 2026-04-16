@@ -5,6 +5,7 @@ import { shoplistKeys } from "~/composables/queryKeys";
 export function useShoplists() {
   const api = useApi();
   const toast = useToast();
+  const queryClient = useQueryClient();
 
   const { data, isPending, isError, suspense } = useQuery({
     queryKey: shoplistKeys.all,
@@ -19,8 +20,6 @@ export function useShoplists() {
   onServerPrefetch(async () => {
     await suspense();
   });
-
-  const queryClient = useQueryClient();
 
   const createListMutation = useMutation({
     mutationFn: async (name: string) => {
