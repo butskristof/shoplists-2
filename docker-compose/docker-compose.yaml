@@ -1,0 +1,109 @@
+services:
+  valkey:
+    image: valkey/valkey:9.0
+    command: ["valkey-server", "--requirepass", "${VALKEY_PASSWORD}", "--save", "60", "1"]
+    environment:
+      VALKEY_PASSWORD: "${VALKEY_PASSWORD}"
+    volumes:
+      - valkey-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "${VALKEY_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:17.6
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  database-migrator:
+    image: "${MIGRATOR_IMAGE}"
+    environment:
+      ConnectionStrings__appdb: "Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=appdb"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_SERVICE_NAME: database-migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  api:
+    image: "${API_IMAGE}"
+    environment:
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__appdb: "Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=appdb"
+      Authentication__Authority: "${OIDC_AUTHORITY}"
+      Authentication__Audience: "${OIDC_AUDIENCE}"
+      Authentication__ClientId: "${OIDC_CLIENT_ID}"
+      Authentication__ClientSecret: "${OIDC_CLIENT_SECRET}"
+      Authentication__AuthorizationUrl: "${OIDC_AUTHORIZATION_URL}"
+      Authentication__TokenUrl: "${OIDC_TOKEN_URL}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_SERVICE_NAME: api
+    depends_on:
+      database-migrator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    image: "${FRONTEND_IMAGE}"
+    environment:
+      NODE_ENV: production
+      NUXT_BACKEND_API_URL: "http://api:8080"
+      NUXT_OIDC_SESSION_SECRET: "${OIDC_SESSION_SECRET}"
+      NUXT_OIDC_AUTH_SESSION_SECRET: "${OIDC_AUTH_SESSION_SECRET}"
+      NUXT_OIDC_TOKEN_KEY: "${OIDC_TOKEN_KEY}"
+      NUXT_OIDC_PROVIDERS_OIDC_CLIENT_ID: "${OIDC_CLIENT_ID}"
+      NUXT_OIDC_PROVIDERS_OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET}"
+      NUXT_OIDC_PROVIDERS_OIDC_REDIRECT_URI: "${PUBLIC_URL}/auth/oidc/callback"
+      NUXT_OIDC_PROVIDERS_OIDC_OPEN_ID_CONFIGURATION: "${OIDC_OPENID_CONFIGURATION}"
+      NUXT_OIDC_PROVIDERS_OIDC_AUTHORIZATION_URL: "${OIDC_AUTHORIZATION_URL}"
+      NUXT_OIDC_PROVIDERS_OIDC_TOKEN_URL: "${OIDC_TOKEN_URL}"
+      NUXT_OIDC_PROVIDERS_OIDC_USER_INFO_URL: "${OIDC_USERINFO_URL}"
+      NUXT_OIDC_PROVIDERS_OIDC_LOGOUT_URL: "${OIDC_LOGOUT_URL}"
+      NUXT_REDIS_HOST: valkey
+      NUXT_REDIS_PORT: "6379"
+      NUXT_REDIS_PASSWORD: "${VALKEY_PASSWORD}"
+      NUXT_REDIS_TLS: "false"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_SERVICE_NAME: frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      valkey:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  valkey-data:
+  postgres-data:
