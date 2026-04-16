@@ -16,6 +16,7 @@ const {
   toggleItem,
   reorderItem,
 } = useShoplist(props.listId);
+const hasNoItems = computed(() => list.value?.items.length === 0);
 
 const isEditMode = useRouteQuery("edit", String(false), {
   transform: {
@@ -54,14 +55,8 @@ const editingName = ref("");
 const nameInputInvalid = ref(false);
 
 watch(isEditingName, (editing) => {
-  if (editing) {
-    editingName.value = list.value?.name ?? "";
-    nameInputInvalid.value = false;
-  }
-  else {
-    editingName.value = "";
-    nameInputInvalid.value = false;
-  }
+  editingName.value = editing ? list.value?.name ?? "" : "";
+  nameInputInvalid.value = false;
 });
 
 watch(editingName, () => {
@@ -147,6 +142,7 @@ function saveName() {
       </template>
       <template v-else>
         <Button
+          v-if="!hasNoItems"
           icon="pi pi-pencil"
           aria-label="Edit list"
           label="Edit list"
@@ -156,7 +152,7 @@ function saveName() {
     </div>
   </div>
 
-  <div class="lists">
+  <div class="list-items">
     <!-- Edit mode: single merged list -->
     <template v-if="isEditMode">
       <section aria-label="Edit list items">
@@ -177,64 +173,66 @@ function saveName() {
       </section>
     </template>
 
-    <StatePanel
-      v-else-if="list.items.length === 0"
-      icon="pi pi-check-circle"
-      message="Ready to go! Add some items to your list to get started."
-    >
-      <template #action>
-        <Button
-          label="Add items"
-          icon="pi pi-pencil"
-          @click="toggleEditMode"
-        />
-      </template>
-    </StatePanel>
-
-    <!-- Normal mode: shopping view -->
     <template v-else>
-      <section class="todo-section" aria-label="Items to get">
-        <h2 class="normal-mode-heading">
-          Items to get
-        </h2>
-        <StatePanel
-          v-if="itemsToGet.length === 0"
-          icon="pi pi-check-circle"
-          message="All done! Nothing left to get."
-        >
-          <template #action>
-            <Button
-              label="Add more items"
-              icon="pi pi-pencil"
-              @click="toggleEditMode"
-            />
-          </template>
-        </StatePanel>
-        <ul v-else class="item-list">
-          <li v-for="item in itemsToGet" :key="item.id">
-            <ShoplistItemRow
-              :item="item"
-              :is-edit-mode="false"
-              @toggle="toggleItem(item.id)"
-            />
-          </li>
-        </ul>
-      </section>
+      <StatePanel
+        v-if="hasNoItems"
+        icon="pi pi-check-circle"
+        message="Ready to go! Add some items to your list to get started."
+      >
+        <template #action>
+          <Button
+            label="Add items"
+            icon="pi pi-pencil"
+            @click="toggleEditMode"
+          />
+        </template>
+      </StatePanel>
 
-      <section v-if="fulfilledItems.length > 0" class="fulfilled-section" aria-label="Fulfilled items">
-        <h2 class="normal-mode-heading">
-          Fulfilled
-        </h2>
-        <ul class="item-list">
-          <li v-for="item in fulfilledItems" :key="item.id">
-            <ShoplistItemRow
-              :item="item"
-              :is-edit-mode="false"
-              @toggle="toggleItem(item.id)"
-            />
-          </li>
-        </ul>
-      </section>
+      <!-- Normal mode: shopping view -->
+      <template v-else>
+        <section class="items-to-get-section" aria-label="Items to get">
+          <h2 class="normal-mode-heading">
+            Items to get
+          </h2>
+          <StatePanel
+            v-if="itemsToGet.length === 0"
+            icon="pi pi-check-circle"
+            message="All done! Nothing left to get."
+          >
+            <template #action>
+              <Button
+                label="Add more items"
+                icon="pi pi-pencil"
+                @click="toggleEditMode"
+              />
+            </template>
+          </StatePanel>
+          <ul v-else class="item-list">
+            <li v-for="item in itemsToGet" :key="item.id">
+              <ShoplistItemRow
+                :item="item"
+                :is-edit-mode="false"
+                @toggle="toggleItem(item.id)"
+              />
+            </li>
+          </ul>
+        </section>
+
+        <section v-if="fulfilledItems.length > 0" class="fulfilled-section" aria-label="Fulfilled items">
+          <h2 class="normal-mode-heading">
+            Fulfilled
+          </h2>
+          <ul class="item-list">
+            <li v-for="item in fulfilledItems" :key="item.id">
+              <ShoplistItemRow
+                :item="item"
+                :is-edit-mode="false"
+                @toggle="toggleItem(item.id)"
+              />
+            </li>
+          </ul>
+        </section>
+      </template>
     </template>
   </div>
 </template>
@@ -275,7 +273,7 @@ function saveName() {
   }
 }
 
-.lists {
+.list-items {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);

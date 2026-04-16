@@ -41,15 +41,17 @@ async function handleCreate() {
       class="create-list-form"
       @submit.prevent="handleCreate"
     >
-      <label for="new-list-name">Name</label>
-      <InputText
-        id="new-list-name"
-        v-model="name"
-        :invalid="nameInvalid"
-        autofocus
-        fluid
-        placeholder="e.g. Weekly groceries"
-      />
+      <div class="form-field">
+        <label for="new-list-name">Name</label>
+        <InputText
+          id="new-list-name"
+          v-model="name"
+          :invalid="nameInvalid"
+          autofocus
+          fluid
+          placeholder="e.g. Weekly groceries"
+        />
+      </div>
     </form>
     <template #footer>
       <div class="footer-actions">
@@ -73,7 +75,7 @@ async function handleCreate() {
 </template>
 
 <style scoped>
-.create-list-form {
+.form-field {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);

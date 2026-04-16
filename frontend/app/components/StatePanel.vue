@@ -20,7 +20,7 @@ const { variant = "default" } = defineProps<{
 
 <style scoped>
 .state-panel {
-  padding: var(--spacing-lg) var(--spacing-md);
+  padding: var(--spacing-lg);
 
   display: flex;
   flex-direction: column;

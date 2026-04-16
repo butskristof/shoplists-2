@@ -90,9 +90,6 @@ export function useShoplist(listId: string) {
     await suspense();
   });
 
-  // eslint-disable-next-line style/spaced-comment
-  //#region sorted & filtered items
-
   const sortedItems = computed(() =>
     (data.value?.items ?? []).toSorted(
       (a, b) => Number(a.position) - Number(b.position),
@@ -106,9 +103,6 @@ export function useShoplist(listId: string) {
   const fulfilledItems = computed(() =>
     sortedItems.value.filter(item => item.isFulfilled),
   );
-
-  // eslint-disable-next-line style/spaced-comment
-  //#endregion
 
   interface OptimisticContext { previousList: Shoplist | undefined }
 
@@ -161,7 +155,7 @@ export function useShoplist(listId: string) {
   };
 
   // Add item
-  const addMutation = useMutation({
+  const addItemMutation = useMutation({
     mutationFn: async (name: string) => {
       const { error } = await api.POST(
         "/shoplists/{listId}/items",
@@ -181,10 +175,10 @@ export function useShoplist(listId: string) {
     },
   });
 
-  const addItem = (name: string) => void addMutation.mutate(name);
+  const addItem = (name: string) => void addItemMutation.mutate(name);
 
   // Delete item
-  const deleteMutation = useMutation<void, Error, string, OptimisticContext>({
+  const deleteItemMutation = useMutation<void, Error, string, OptimisticContext>({
     mutationFn: async (itemId: string) => {
       const { error } = await api.DELETE(
         "/shoplists/{listId}/items/{itemId}",
@@ -224,10 +218,10 @@ export function useShoplist(listId: string) {
     },
   });
 
-  const deleteItem = (itemId: string) => void deleteMutation.mutate(itemId);
+  const deleteItem = (itemId: string) => void deleteItemMutation.mutate(itemId);
 
   // Update item name
-  const updateNameMutation = useMutation<void, Error, { itemId: string; name: string }, OptimisticContext>({
+  const updateItemNameMutation = useMutation<void, Error, { itemId: string; name: string }, OptimisticContext>({
     mutationFn: async ({ itemId, name }) => {
       const { error } = await api.PUT(
         "/shoplists/{listId}/items/{itemId}",
@@ -267,7 +261,7 @@ export function useShoplist(listId: string) {
   });
 
   const updateItemName = (itemId: string, name: string) =>
-    void updateNameMutation.mutate({ itemId, name });
+    void updateItemNameMutation.mutate({ itemId, name });
 
   // Reorder item
   const reorderMutation = useMutation<void, Error, { itemId: string; position: number }, OptimisticContext>({

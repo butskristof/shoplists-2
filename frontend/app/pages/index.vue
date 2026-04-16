@@ -2,7 +2,7 @@
 useHead({ title: "Your lists" });
 
 const { lists, isPending, isError } = useShoplists();
-const isEmpty = computed(() => lists.value?.length === 0);
+const hasNoLists = computed(() => lists.value?.length === 0);
 
 const showCreateDialog = ref(false);
 
@@ -57,7 +57,7 @@ async function handleCreated(id: string) {
     </ul>
 
     <StatePanel
-      v-else-if="isEmpty"
+      v-else-if="hasNoLists"
       icon="pi pi-list"
       title="No lists yet"
       message="Create a list to get started"
@@ -113,9 +113,9 @@ async function handleCreated(id: string) {
       font-weight: var(--weight-medium);
       font-size: var(--font-size-lg);
       line-height: var(--font-size-lg--line-height);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      //overflow: hidden;
+      //text-overflow: ellipsis;
+      //white-space: nowrap;
     }
 
     .meta {
