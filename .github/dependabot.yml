@@ -17,6 +17,9 @@ updates:
           - "nuxt"
           - "@nuxt/*"
           - "nuxt-*"
+      opentelemetry:
+        patterns:
+          - "@opentelemetry/*"
       dev-dependencies:
         dependency-type: development
         exclude-patterns:
@@ -56,3 +59,7 @@ updates:
       day: friday
       time: "18:00"
       timezone: Europe/Brussels
+    groups:
+      docker:
+        patterns:
+          - "docker/*"
