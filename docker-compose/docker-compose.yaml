@@ -20,6 +20,7 @@ services:
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: appdb
     volumes:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -30,7 +31,7 @@ services:
       retries: 5
 
   database-migrator:
-    image: "${MIGRATOR_IMAGE}"
+    image: "${DATABASE_MIGRATOR_IMAGE}"
     environment:
       ConnectionStrings__appdb: "Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=appdb"
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
@@ -60,7 +61,7 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health/ready || exit 1"]
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5

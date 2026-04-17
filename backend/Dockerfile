@@ -21,6 +21,10 @@ RUN dotnet publish src/3-hosts/DatabaseMigrator/DatabaseMigrator.csproj -a $TARG
 
 # Runtime targets
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS api
+# curl is used by the container HEALTHCHECK to probe /health/ready; not shipped in the base image.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --link --from=publish-api /out .
 USER $APP_UID
