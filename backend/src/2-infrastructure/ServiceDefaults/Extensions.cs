@@ -112,26 +112,27 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment())
-        {
-            // Readiness: runs ALL registered health checks (self + dependencies like DB, cache, ...).
-            // A failure means "don't send me traffic" — the service can't do useful work right now.
-            app.MapHealthChecks(HealthCheckConstants.Endpoints.Ready);
+        // Health endpoints are mapped unconditionally (Aspire's template gates them on IsDevelopment
+        // for security reasons — info disclosure via check names, DoS via unauth dependency I/O).
+        // In this deployment those risks don't apply: the API has no host-port mapping and the BFF
+        // only proxies /api/*, so /health/* is only reachable on the internal Docker network.
+        // See docs/decisions/013-expose-health-endpoints-in-production.md.
 
-            // Liveness: runs ONLY checks tagged "live" (currently just the trivial "self" check).
-            // A failure means "the process is stuck/deadlocked, restart it."
-            // Dependency checks are deliberately excluded — a database outage should not trigger
-            // a container restart, as that won't fix the database.
-            app.MapHealthChecks(
-                HealthCheckConstants.Endpoints.Live,
-                new HealthCheckOptions
-                {
-                    Predicate = r => r.Tags.Contains(HealthCheckConstants.Tags.Live),
-                }
-            );
-        }
+        // Readiness: runs ALL registered health checks (self + dependencies like DB, cache, ...).
+        // A failure means "don't send me traffic" — the service can't do useful work right now.
+        app.MapHealthChecks(HealthCheckConstants.Endpoints.Ready);
+
+        // Liveness: runs ONLY checks tagged "live" (currently just the trivial "self" check).
+        // A failure means "the process is stuck/deadlocked, restart it."
+        // Dependency checks are deliberately excluded — a database outage should not trigger
+        // a container restart, as that won't fix the database.
+        app.MapHealthChecks(
+            HealthCheckConstants.Endpoints.Live,
+            new HealthCheckOptions
+            {
+                Predicate = r => r.Tags.Contains(HealthCheckConstants.Tags.Live),
+            }
+        );
 
         return app;
     }
