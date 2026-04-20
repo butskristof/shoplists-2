@@ -15,7 +15,58 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ["@primevue/nuxt-module", "@nuxt/fonts", "@nuxt/eslint", "@nuxtjs/color-mode", "nuxt-oidc-auth", "nuxt-security"],
+  modules: [
+    "@primevue/nuxt-module",
+    "@nuxt/fonts",
+    "@nuxt/eslint",
+    "@nuxtjs/color-mode",
+    "nuxt-oidc-auth",
+    "nuxt-security",
+    "@vite-pwa/nuxt",
+  ],
+
+  pwa: {
+    registerType: "autoUpdate",
+    devOptions: { enabled: false },
+    // vite-plugin-pwa only wires pwa-assets.config.ts into the head-injection virtual
+    // module when this integration is explicitly enabled — default is `false`.
+    // Without it `<NuxtPwaAssets />` emits only the manifest link, not the icon/
+    // theme-color tags derived from the assets config.
+    pwaAssets: { config: true },
+    manifest: {
+      // Stable PWA identity. Must never change after launch — browsers use this to
+      // recognise the app across updates, independently of start_url.
+      id: "/",
+      name: "Shoplists",
+      short_name: "Shoplists",
+      description: "Grocery shopping lists",
+      lang: "en",
+      dir: "ltr",
+      start_url: "/",
+      scope: "/",
+      display: "standalone",
+      theme_color: "#10b981",
+      background_color: "#09090b",
+      icons: [
+        { src: "pwa-64x64.png", sizes: "64x64", type: "image/png" },
+        { src: "pwa-192x192.png", sizes: "192x192", type: "image/png" },
+        { src: "pwa-512x512.png", sizes: "512x512", type: "image/png" },
+        { src: "maskable-icon-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      ],
+    },
+    workbox: {
+      // @vite-pwa/nuxt seeds globPatterns with a couple of JSON manifest entries,
+      // which suppresses Workbox's default `**/*.{js,wasm,css,html}` fallback — so
+      // without an explicit list the precache holds only 3 tiny files and the SPA
+      // shell is never cached. Be explicit to actually precache the app shell.
+      // Note: Nuxt renders HTML via Nitro at runtime and does not emit a static
+      // `/` into `.output/public/`, so no HTML is precached here. This enables
+      // fast repeat loads but not offline navigation — offline navigation is
+      // deferred to Phase 2 in docs/plans/pwa.md and requires a prerendered
+      // app-shell route as the `navigateFallback` target.
+      globPatterns: ["**/*.{js,css,png,svg,ico,webmanifest,woff2}"],
+    },
+  },
 
   security: {
     // SECURITY: do not enable corsHandler without revisiting the x-csrf

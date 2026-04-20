@@ -154,6 +154,29 @@ loop entirely. Silent auto-update is acceptable until we add the update-prompt U
 **Exit criteria**: app installs cleanly on iOS and Android, looks right, opens standalone,
 nothing is broken, SW silently precaches the shell.
 
+**Implementation notes (captured during Phase 1 wire-up):**
+
+- **Upstream bug workaround — [vite-pwa/nuxt#223](https://github.com/vite-pwa/nuxt/issues/223)**:
+  `<NuxtPwaAssets />` mutates a reactive ref after calling `useHead`, without dedup keys. Combined
+  with `nuxt-security`'s server-side nonce injection, unhead can't merge SSR + hydration entries
+  and every icon `<link>` ends up in the DOM twice. We wrap the component in `<ClientOnly>` with
+  a `#fallback` slot so it only contributes during SSR; the emitted head tags hydrate normally and
+  nothing re-pushes on the client. Drop the wrapper in both `app.vue` and `error.vue` when the
+  issue is resolved upstream.
+- **`pwaAssets.config: true` is required** for the assets-generator config file to be read by
+  vite-plugin-pwa at build time. Default is `false`, which would leave the head-injection virtual
+  module empty (only the manifest link would be emitted, no icons or theme-color meta).
+- **`workbox.globPatterns` must be set explicitly.** The Nuxt module seeds it with just the
+  build-manifest JSON paths, which suppresses Workbox's default `**/*.{js,wasm,css,html}` fallback.
+  Without an explicit pattern the precache holds only 3 tiny files and the app shell is not cached.
+  Current pattern: `**/*.{js,css,png,svg,ico,webmanifest,woff2}` (~4 MB on cold install).
+- **`navigateFallback` / `navigateFallbackDenylist` were held back from Phase 1.** The SW's
+  NavigationRoute would need a cached HTML shell as its fallback target, but Nuxt renders `/` via
+  Nitro at runtime and emits no static HTML into `.output/public/`. Enabling this in Phase 2
+  requires either prerendering `/` as a static SPA shell (loses SSR on the landing page) or a
+  dedicated hidden shell route excluded from OIDC middleware and prerendered. Decide at Phase 2
+  kickoff.
+
 ### Phase 2 — Offline UX + update prompt (UX layer on top of existing SW)
 
 **Goal**: honest, visible offline state; user-controlled update flow.
@@ -162,7 +185,10 @@ nothing is broken, SW silently precaches the shell.
   friends) without per-file imports.
 - Persistent offline banner in the root layout, driven by `useOnline()`. Visible whenever offline.
 - Workbox config tightening:
-  - Explicit `navigateFallback: '/'` for SPA routing (may already be the default).
+  - Explicit `navigateFallback` for SPA routing. Target route must be present in the precache,
+    so this needs a prerendered shell (see Phase 1 implementation notes — Nuxt does not emit a
+    static `/` because `/` is SSR'd at runtime). Decide between prerendering `/` as SPA vs. a
+    hidden dedicated shell route at Phase 2 kickoff.
   - `navigateFallbackDenylist` for `/api/*` and `/auth/*`.
 - SW update flow: on `updatefound` + waiting SW, show a PrimeVue toast with a "New version —
   reload?" action. Replace silent auto-update with explicit user confirmation mid-session.

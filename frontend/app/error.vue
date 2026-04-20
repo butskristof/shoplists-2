@@ -14,6 +14,12 @@ useHead({
 </script>
 
 <template>
+  <!-- SSR-only to avoid duplicate head entries; see app.vue for the full rationale. -->
+  <ClientOnly>
+    <template #fallback>
+      <NuxtPwaAssets />
+    </template>
+  </ClientOnly>
   <NuxtLayout>
     <div class="error-content">
       <template v-if="isNotFoundError">
