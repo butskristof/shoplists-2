@@ -11,7 +11,8 @@
     "lint": "eslint . --fix",
     "lint:check": "eslint .",
     "typecheck": "nuxt typecheck",
-    "generate:api": "openapi-typescript http://localhost:5242/openapi/v1.json -o ./app/generated/api.d.ts"
+    "generate:api": "openapi-typescript http://localhost:5242/openapi/v1.json -o ./app/generated/api.d.ts",
+    "generate:pwa-assets": "pwa-assets-generator"
   },
   "dependencies": {
     "@nuxt/fonts": "^0.14.0",
@@ -21,6 +22,7 @@
     "@opentelemetry/sdk-node": "^0.215.0",
     "@primeuix/themes": "^2.0.3",
     "@tanstack/vue-query": "^5.99.0",
+    "@vite-pwa/nuxt": "^1.1.1",
     "@vueuse/router": "^14.2.1",
     "ioredis": "^5.10.1",
     "nuxt": "^4.4.2",
@@ -37,6 +39,7 @@
     "@antfu/eslint-config": "^8.2.0",
     "@nuxt/eslint": "^1.15.2",
     "@primevue/nuxt-module": "^4.5.5",
+    "@vite-pwa/assets-generator": "^1.0.2",
     "eslint-plugin-format": "^2.0.1",
     "openapi-typescript": "^7.13.0"
   }
