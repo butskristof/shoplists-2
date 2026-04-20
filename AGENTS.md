@@ -53,7 +53,7 @@ backend/
     3-hosts/
       Api/                   -> Minimal API host, endpoints, auth, OpenAPI
       DatabaseMigrator/      -> Worker service that applies migrations, then exits
-  tests/                     -> (empty; test framework not chosen yet — see Open Decisions)
+  tests/                     -> (empty; see docs/projects/testing/plan.md)
 frontend/
   ...                        -> Nuxt application
 ```
@@ -387,22 +387,20 @@ Reach for this before adding ad-hoc logging or guessing at failure modes.
 - Prefer small, incremental changes. Avoid large rewrites unless discussed.
 - When uncertain, ask — do not assume.
 
-### Keeping this file lean
+### Project documentation
 
 This file is loaded into context on every interaction — keep it focused on **actionable conventions,
-rules, and patterns** needed for forward development. It is not a decision log or changelog.
+rules, and patterns** needed for forward development. It is not a decision log, changelog, or task tracker.
 
-When making architectural or tooling decisions, record the rationale in `docs/decisions/NNN-title.md`
-(ADR-lite format: Status, Context, Decision, Alternatives/trade-offs). Only add the resulting
-**convention or rule** to this file — not the reasoning behind it. Read existing records in
-`docs/decisions/` for the format to follow.
+Three places capture project knowledge:
 
----
+- **`docs/decisions/NNN-title.md`** — ADR-lite records for locked-in architectural or tooling  decisions 
+  (Status, Context, Decision, Alternatives/trade-offs). Only the resulting convention or rule lands in 
+  this file — not the reasoning behind it.
+- **`docs/projects/<project-name>/`** — working docs for in-flight work (both user-facing features
+  and technical concerns like testing or hosting). Suggested files: `plan.md` (goals, non-goals,
+  phased rollout), `open-questions.md`, `resources.md`, `progress.md`. Headline decisions that
+  stabilize graduate to an ADR.
+- **This file** — conventions and rules only.
 
-## Open Decisions
-
-| Decision | Status |
-|---|---|
-| Test framework & setup | Not started (likely TUnit) |
-| CI/CD pipeline | Not started |
-| OpenAPI nullable trade-off | Accepted for now; revisit if painful |
+Read existing records in both folders for format and tone.
