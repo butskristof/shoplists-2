@@ -6,7 +6,7 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
-    "preview": "nuxt preview",
+    "preview": "nuxt preview --host",
     "postinstall": "nuxt prepare",
     "lint": "eslint . --fix",
     "lint:check": "eslint .",
@@ -42,5 +42,8 @@
     "@vite-pwa/assets-generator": "^1.0.2",
     "eslint-plugin-format": "^2.0.1",
     "openapi-typescript": "^7.13.0"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5"
   }
 }

@@ -22,6 +22,9 @@
   position: sticky;
   top: 0;
   z-index: 100;
+
+  /* add additional padding for iPhone header area */
+  padding-top: env(safe-area-inset-top);
 }
 
 .header-content {

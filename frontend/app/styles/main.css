@@ -1,6 +1,35 @@
 body {
   font-family: "Inter", sans-serif;
   color: var(--p-text-color);
+  background-color: transparent;
+}
+
+/* iOS/macOS rubber-band overscroll reveals whatever paints behind the scroll
+   content at the viewport edges. Paint two fixed half-viewport strips behind
+   the app-shell (z-index: -1) so the top bounce shows the header colour and
+   the bottom bounce shows the surface colour. Body stays transparent so the
+   strips show through during overscroll; under normal scroll the opaque
+   .app-shell covers them. Don't "simplify" to a single body background — that
+   re-introduces the colour mismatch at one of the two edges. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 50vh;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body::before {
+  top: 0;
+  background-color: var(--p-content-background);
+}
+
+body::after {
+  bottom: 0;
+  background-color: var(--app-background);
 }
 
 .app-container {
