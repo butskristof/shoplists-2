@@ -21,7 +21,7 @@
     "@opentelemetry/auto-instrumentations-node": "^0.73.0",
     "@opentelemetry/sdk-node": "^0.215.0",
     "@primeuix/themes": "^2.0.3",
-    "@tanstack/vue-query": "^5.99.0",
+    "@tanstack/vue-query": "^5.100.1",
     "@vite-pwa/nuxt": "^1.1.1",
     "@vueuse/router": "^14.2.1",
     "ioredis": "^5.10.1",
@@ -31,9 +31,9 @@
     "openapi-fetch": "^0.17.0",
     "primeicons": "^7.0.0",
     "primevue": "^4.5.5",
-    "vue": "^3.5.32",
+    "vue": "^3.5.33",
     "vue-draggable-plus": "^0.6.1",
-    "vue-router": "^5.0.4"
+    "vue-router": "^5.0.6"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^8.2.0",
