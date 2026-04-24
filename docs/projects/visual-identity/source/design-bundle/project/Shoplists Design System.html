@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1400" />
+<title>Shoplists — Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #f0eee9; }
+  * { box-sizing: border-box; }
+  button { font: inherit; }
+  /* Mode toggle — floating pill in top right */
+  .mode-toggle {
+    position: fixed; top: 20px; right: 20px; z-index: 100;
+    display: inline-flex; background: #fff;
+    border: 1px solid rgba(0,0,0,0.08); border-radius: 999px;
+    padding: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    font-family: "Inter Tight", sans-serif;
+  }
+  .mode-toggle button {
+    border: 0; background: transparent; cursor: pointer;
+    padding: 7px 16px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; letter-spacing: -0.1px;
+    color: rgba(40,30,20,0.55); transition: all 150ms;
+  }
+  .mode-toggle button.active {
+    background: #111714; color: #fff;
+  }
+  .mode-toggle button.active.dark {
+    background: #4FB896; color: #0B1512;
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="frames/ios-frame.jsx"></script>
+<script type="text/babel" src="frames/design-canvas.jsx"></script>
+<script type="text/babel" src="src/tokens.jsx"></script>
+<script type="text/babel" src="src/icons.jsx"></script>
+<script type="text/babel" src="src/logos.jsx"></script>
+<script type="text/babel" src="src/screens.jsx"></script>
+<script type="text/babel" src="src/system-card.jsx"></script>
+
+<script type="text/babel">
+  const { useState } = React;
+
+  // Sample data
+  const homeListsPantry = [
+    { title: 'Weekly groceries', total: 10, done: 6, hint: 'Mon · refreshed 2h ago' },
+    { title: 'Farmers market',   total: 7,  done: 2, hint: 'Sat · 5 items added' },
+    { title: 'Pantry restock',   total: 12, done: 12, hint: 'Done · last week' },
+  ];
+  const homeListsMarket = [
+    { title: 'Weekly groceries', total: 10, done: 6, hint: 'Updated today' },
+    { title: 'IKEA',             total: 1,  done: 0, hint: 'Just added' },
+    { title: 'Dinner party',     total: 8,  done: 3, hint: 'Sat · 4pm' },
+  ];
+
+  const todoItems = ['Butter', 'Peanut butter', 'Sourdough loaf', 'More items'];
+  const doneItems = ['Milk', 'Jam', 'Olive oil', 'Tomatoes', 'Eggs (dozen)', 'Coffee beans'];
+
+  const editItems = [
+    'Milk', 'Butter', 'Peanut butter',
+    'Item with a very long name that wraps',
+    'Sourdough loaf', 'Jam', 'Olive oil',
+  ];
+
+  // Phone wrapper
+  function Phone({ children, label }) {
+    return (
+      <DCArtboard label={label} width={402} height={874}>
+        <IOSDevice width={402} height={874}>
+          {children}
+        </IOSDevice>
+      </DCArtboard>
+    );
+  }
+
+  function App() {
+    const [mode, setMode] = useState('both'); // 'light' | 'dark' | 'both'
+
+    const light = TOKENS.market;
+    const dark = TOKENS.marketDark;
+
+    const lightLogoSm = <LogoMarket size={26} color={light.primary} wordColor={light.ink} />;
+    const lightLogoLg = <LogoMarket size={56} color={light.primary} wordColor={light.ink} />;
+    const darkLogoSm = <LogoMarket size={26} color={dark.primary} wordColor={dark.ink} />;
+    const darkLogoLg = <LogoMarket size={56} color={dark.primary} wordColor={dark.ink} />;
+
+    const showLight = mode === 'light' || mode === 'both';
+    const showDark = mode === 'dark' || mode === 'both';
+
+    const renderScreens = (t, logoSm, lists, labelSuffix) => (
+      <>
+        <Phone label={`Home${labelSuffix}`}>
+          <ScreenHome t={t} flavor="market" logo={logoSm} lists={lists} />
+        </Phone>
+        <Phone label={`Detail${labelSuffix}`}>
+          <ScreenDetail t={t} flavor="market" logo={logoSm}
+            listName="Weekly groceries" todo={todoItems} done={doneItems} />
+        </Phone>
+        <Phone label={`Edit${labelSuffix}`}>
+          <ScreenEdit t={t} flavor="market" logo={logoSm}
+            listName="Weekly groceries" items={editItems} />
+        </Phone>
+      </>
+    );
+
+    return (
+      <>
+      <div className="mode-toggle">
+        <button className={mode === 'light' ? 'active' : ''} onClick={() => setMode('light')}>Light</button>
+        <button className={mode === 'both' ? 'active' : ''} onClick={() => setMode('both')}>Both</button>
+        <button className={mode === 'dark' ? 'active dark' : ''} onClick={() => setMode('dark')}>Dark</button>
+      </div>
+      <DesignCanvas>
+        {/* Intro */}
+        <div style={{ padding: '0 60px 60px', maxWidth: 1000 }}>
+          <div style={{
+            fontFamily: '"Inter Tight", sans-serif', fontSize: 12,
+            letterSpacing: 2, textTransform: 'uppercase',
+            color: 'rgba(60,50,40,0.7)', fontWeight: 600,
+          }}>Direction chosen · Market</div>
+          <h1 style={{
+            fontFamily: '"Inter Tight", sans-serif',
+            fontSize: 64, fontWeight: 700, letterSpacing: -2,
+            margin: '10px 0 16px', color: '#1a1a1a',
+          }}>Shoplists — visual identity</h1>
+          <p style={{
+            fontFamily: '"Inter Tight", sans-serif', fontSize: 18,
+            color: 'rgba(40,30,20,0.75)', maxWidth: 760,
+            lineHeight: 1.5, margin: 0,
+          }}>
+            A warm, grocery-adjacent foundation with tight neo-grotesque
+            type (Inter Tight) throughout. Dark mode is derived from the
+            light system: bg shifts to a green-black, surfaces step up in
+            lightness for elevation, and the emerald primary lightens so
+            it stays legible. Use the toggle above to compare.
+          </p>
+        </div>
+
+        {showLight && (
+          <DCSection
+            title="Market · Light"
+            subtitle="Crisp whites, deep emerald, coral accent."
+            gap={56}
+          >
+            <SystemCard t={light} flavor="market" logoLarge={lightLogoLg} />
+            {renderScreens(light, lightLogoSm, homeListsMarket, ' · Light')}
+          </DCSection>
+        )}
+
+        {showDark && (
+          <DCSection
+            title="Market · Dark"
+            subtitle="Dark green-black with lightened emerald. Elevation via stepped surfaces."
+            gap={56}
+          >
+            <SystemCard t={dark} flavor="market" logoLarge={darkLogoLg} />
+            {renderScreens(dark, darkLogoSm, homeListsMarket, ' · Dark')}
+          </DCSection>
+        )}
+
+        {/* Closing note */}
+        <div style={{ padding: '0 60px 60px', maxWidth: 820 }}>
+          <div style={{
+            fontFamily: '"Inter Tight", sans-serif', fontSize: 12,
+            letterSpacing: 2, textTransform: 'uppercase',
+            color: 'rgba(60,50,40,0.7)', fontWeight: 600,
+          }}>Next</div>
+          <p style={{
+            fontFamily: '"Inter Tight", sans-serif', fontSize: 16,
+            color: 'rgba(40,30,20,0.75)', lineHeight: 1.55, marginTop: 10,
+          }}>
+            Now that Market is the chosen direction, we can translate tokens
+            into PrimeVue theme overrides (CSS variables for <code>--p-primary-color</code>,
+            <code> --p-surface-*</code>, etc.), swap the cart
+            icon for the new mark, and add motion (satisfying check-off, row
+            slide into the Fulfilled section).
+          </p>
+        </div>
+      </DesignCanvas>
+      </>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
