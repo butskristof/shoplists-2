@@ -1,4 +1,4 @@
-import Aura from "@primeuix/themes/aura";
+import { Market } from "./app/styles/theme";
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
@@ -45,8 +45,8 @@ export default defineNuxtConfig({
       start_url: "/",
       scope: "/",
       display: "standalone",
-      theme_color: "#10b981",
-      background_color: "#09090b",
+      theme_color: "#0F6B50",
+      background_color: "#F7F8F6",
       icons: [
         { src: "pwa-64x64.png", sizes: "64x64", type: "image/png" },
         { src: "pwa-192x192.png", sizes: "192x192", type: "image/png" },
@@ -95,7 +95,7 @@ export default defineNuxtConfig({
   primevue: {
     options: {
       theme: {
-        preset: Aura,
+        preset: Market,
         options: {
           darkModeSelector: ".dark-mode",
           cssLayer: {

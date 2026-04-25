@@ -1,5 +1,5 @@
 body {
-  font-family: "Inter", sans-serif;
+  font-family: "Inter Tight", sans-serif;
   color: var(--p-text-color);
   background-color: transparent;
 }
@@ -54,4 +54,5 @@ h1 {
   line-height: var(--font-size-3xl--line-height);
   font-weight: var(--weight-bold);
   color: var(--p-text-color);
+  letter-spacing: -0.3px;
 }
