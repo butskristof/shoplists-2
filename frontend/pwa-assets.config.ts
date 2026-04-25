@@ -1,8 +1,9 @@
 import { minimal2023Preset as basePreset, defineConfig } from "@vite-pwa/assets-generator/config";
 
-// Background applied around the source in the generator's padding area. Matches --p-surface-950
-// (zinc.950, app dark-mode background) so the padding blends with our built-in source tile.
-const darkSurface = "#09090b";
+// Background applied around the source in the generator's padding area. Must match the
+// rect fill in pwa-source.svg so padding blends seamlessly with the source tile, and the
+// PWA manifest's background_color so the iOS splash transitions cleanly into the icon.
+const iconBackground = "#F7F8F6";
 
 export default defineConfig({
   headLinkOptions: {
@@ -19,12 +20,12 @@ export default defineConfig({
     maskable: {
       ...basePreset.maskable,
       padding: 0.15,
-      resizeOptions: { fit: "contain", background: darkSurface },
+      resizeOptions: { fit: "contain", background: iconBackground },
     },
     apple: {
       ...basePreset.apple,
       padding: 0.1,
-      resizeOptions: { fit: "contain", background: darkSurface },
+      resizeOptions: { fit: "contain", background: iconBackground },
     },
   },
   images: ["public/pwa-source.svg"],
