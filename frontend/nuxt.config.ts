@@ -1,4 +1,4 @@
-import Aura from "@primeuix/themes/aura";
+import { Market } from "./app/styles/theme";
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
@@ -95,7 +95,7 @@ export default defineNuxtConfig({
   primevue: {
     options: {
       theme: {
-        preset: Aura,
+        preset: Market,
         options: {
           darkModeSelector: ".dark-mode",
           cssLayer: {
