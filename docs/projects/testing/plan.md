@@ -1,8 +1,8 @@
 # Testing — Planning Notes
 
-Living document. Captures intent, open questions, and rollout plan for introducing an automated
-test suite to Shoplists. Currently the repo has zero automated tests — verification is manual via
-Playwright MCP tooling.
+Living document. Captures intent, open questions, and rollout plan for the automated test suite.
+Domain unit tests are now live (TUnit). Handler-level integration tests are the next major shape
+to stand up. Frontend verification remains manual via Playwright MCP tooling.
 
 When decisions stabilize (framework choice, test DB strategy), the headline ones should be captured
 as ADRs under `docs/decisions/`. This file is the working plan, not a decision record.
@@ -32,17 +32,79 @@ as ADRs under `docs/decisions/`. This file is the working plan, not a decision r
 
 ---
 
-## Framework lean: TUnit
+## Framework: TUnit
 
-TUnit is the current lean (flagged in an earlier version of CLAUDE.md). Reasons to confirm or
-reconsider during setup:
+TUnit is the chosen framework. Picked for its source-generated, parallel-by-default, async-first
+API which fits the bleeding-edge posture of the rest of the stack (.NET 10, Mediator source
+generators, StronglyTypedId). Trade-off accepted: smaller community and less agent/MCP familiarity
+than xUnit, mitigated by the fact that the framework is small and the test surface is well-defined.
 
-- **Pro TUnit**: modern, source-generated, fits the bleeding-edge posture of the rest of the stack
-  (.NET 10, Mediator source generators, StronglyTypedId). Parallel-by-default, async-first API.
-- **Pro xUnit**: safer default, larger community, more MCP/agent familiarity, more examples in
-  Microsoft docs.
-- **Decision should land as an ADR** once the first test project exists — capture the trade-off
-  taken and the reasoning at that moment.
+**Action item**: write an ADR capturing this decision now that the first test project exists.
+
+### Test runner: MTP-native `dotnet test`
+
+TUnit uses Microsoft.Testing.Platform (MTP). On .NET 10 SDK, `dotnet test` ships with a new
+MTP-native mode that replaces the legacy VSTest bridge (the `TestingPlatformDotnetTestSupport`
+MSBuild property is the *old* mechanism for .NET 9 SDK and earlier — Microsoft is removing it in
+MTP v2 on .NET 10).
+
+Opt-in is set once at the solution level in `backend/global.json`:
+
+```json
+{
+  "sdk": { "rollForward": "latestFeature", "version": "10.0.100" },
+  "test": { "runner": "Microsoft.Testing.Platform" }
+}
+```
+
+Canonical invocations (run from `backend/`):
+
+```
+dotnet test --solution Shoplists.slnx              # full solution
+dotnet test --project tests/Domain.UnitTests/...   # single project
+dotnet run --project tests/Domain.UnitTests/...    # bypass dotnet test, use the exe directly
+```
+
+Note the `--solution` / `--project` flags — required in MTP mode, unlike legacy VSTest mode where
+you'd pass the path positionally. CI wiring should use the `--solution` form against
+`Shoplists.slnx`.
+
+## Conventions
+
+These are the conventions agreed during the domain unit test bootstrap. They apply project-wide;
+adjust here when patterns evolve.
+
+- **Naming**: `Method_Scenario_ExpectedResult`. The scenario clause may be omitted when the
+  expected result alone is unambiguous (`AddItem_AppendsItemToItemsCollection`). For sequence-heavy
+  scenarios that don't compress into a method name, use `[DisplayName("…")]` for runner output.
+- **Class layout**: one test class per *acted-upon* method on the SUT, grouped under an entity
+  folder mirroring the source structure:
+  `Domain.UnitTests/Models/<Feature>/<Entity>Tests/<Method>Tests.cs`. Example:
+  `Models/Shoplists/ShoplistTests/AddItemTests.cs`. The "act" is the method whose behaviour the
+  test characterises — prior calls (other entity methods) are arrange.
+- **AAA structure**: blank lines separate Arrange / Act / Assert. No `// Arrange` comments — the
+  blank-line shape carries the structure.
+- **One behaviour per test**: a single `[Test]` covers one behaviour. Multiple `Assert.That` calls
+  in one test are fine when they describe facets of the same behaviour ("new item has correct
+  name AND correct ShoplistId"); not fine when they're really two scenarios glued together.
+- **Builders**: prefer `Tests.Common` builders over hand-constructed entities. The implicit cast
+  is the default form — `Shoplist sut = new ShoplistBuilder().WithName("X");` — when no
+  post-construction setup is needed. Use explicit `.Build()` only when the call site needs to keep
+  the builder around for further configuration.
+- **Builders use the entity's domain methods** for state setup that exercises invariants (e.g.
+  `sut.AddItem(...)` rather than reaching into private state). Builder helpers may be added once
+  duplication shows up across tests, but should delegate to the entity rather than reimplement
+  domain logic.
+- **Assertions**: TUnit's built-in async assertions (`await Assert.That(value).IsEqualTo(...)`).
+  No FluentAssertions / Shouldly — fewer dependencies, async-aware out of the box.
+- **Parametric data**: `[Arguments(...)]` for compile-time data, `[MethodDataSource]` for complex
+  data. Use parametric tests when the cases hit the same code branch with varied inputs; split
+  into separate tests when cases hit different branches.
+- **Test class accessibility**: `public sealed`. Public is required by TUnit; sealed follows the
+  project default ("internal sealed by default; widen to public when another project needs the
+  type, drop sealed only when designed for inheritance").
+- **`Tests.Common` types**: `public sealed`. The whole project exists to be consumed by other test
+  projects — keep types public rather than maintain `[InternalsVisibleTo]` lists.
 
 ## Scope — what kinds of tests
 
@@ -95,23 +157,57 @@ bootstrap the test project first.
 
 ## Rollout sketch
 
-1. Pick framework, create `backend/tests/Application.Tests/` (or similar) project, wire into
-   `Shoplists.slnx`.
-2. Stand up Testcontainers PostgreSQL fixture. Prove with one handler test (e.g. `CreateShoplist`
-   happy path + validation failure).
-3. Write ADR capturing framework choice + fixture approach.
-4. Extend `.github/workflows/pr-validation.yml` with a test step (only after the suite is stable
-   and fast enough to not block PRs).
-5. Backfill tests for existing handlers opportunistically when touching them. Do not block on a
+1. ~~Pick framework~~ ✓ TUnit chosen.
+2. ~~Bootstrap shared `Tests.Common` builders project + first test project~~ ✓ Domain unit tests
+   live in `Tests.Common` + `Domain.UnitTests`, wired into `Shoplists.slnx`.
+3. ~~Opt into MTP-native `dotnet test`~~ ✓ via `backend/global.json`.
+4. **Cover `Shoplist` domain methods** — `AddItem` reference test in place; `RemoveItem`,
+   `MoveItem` next. (in flight)
+5. **Application-layer / handler tests** — stand up `Application.UnitTests` for pipeline behaviours
+   and validation helpers (no DB).
+6. **Handler integration tests** — new project + Testcontainers PostgreSQL fixture. Prove with one
+   handler (e.g. `CreateShoplist` happy path + validation failure).
+7. **Write the framework + fixture ADR(s)** — TUnit decision; `dotnet test` opt-in mechanism;
+   Testcontainers vs Aspire test host (when picked).
+8. **Extend `.github/workflows/pr-validation.yml`** with `dotnet test --solution Shoplists.slnx`
+   once the suite is stable and fast enough to not block PRs.
+9. Backfill tests for existing handlers opportunistically when touching them. Don't block on a
    coverage pass.
-6. Adopt TDD-first for new handlers going forward.
+10. Adopt TDD-first for new handlers going forward.
+
+---
+
+## Progress
+
+- **2026-04-28** — Domain test bootstrap.
+  - `Tests.Common` project with `ShoplistBuilder` (public sealed; implicit cast to `Shoplist`).
+  - `Domain.UnitTests` project covering `Shoplist` construction and all three mutation methods:
+    - `ConstructorTests` (1 test) — non-empty self-generated Id.
+    - `AddItemTests` (5 tests, 7 cases via `[Arguments]`) — first-position, max+1 reindex,
+      collection append, name + ShoplistId initialization, non-empty ShoplistItem Id.
+    - `RemoveItemTests` (5 tests) — unknown id throws, removal from collection, only-item edge,
+      mid-list reindex, last-item edge.
+    - `MoveItemTests` (7 tests, 8 cases) — unknown id throws, out-of-range returns, same-position
+      no-op, move-down and move-up reindex.
+  - Conventions agreed and documented above.
+  - `backend/global.json` extended with `test.runner` to enable MTP-native `dotnet test`.
+  - Verified: `dotnet test --solution Shoplists.slnx --no-build` runs the full suite (21/21
+    passing).
+  - **Domain change** (driven by the test bootstrap): `Shoplist.Id` and `ShoplistItem.Id` now
+    self-generate via `<TypeId>.New()` initializers. Previously they defaulted to `Guid.Empty`
+    and relied on EF Core to fill in identity on insert — fine in production but unworkable in
+    domain unit tests (every in-memory item collided on Id). Convention captured in `CLAUDE.md`
+    under Domain Entity Conventions.
+  - **Outstanding**: `global.json` is not yet listed under `Solution Items` in `Shoplists.slnx`.
+    The dotnet CLI's `dotnet sln add` only accepts projects, not loose files — adding it requires
+    a manual slnx edit. Decide whether to add it (IDE-visibility convenience) or leave it
+    file-system-only.
 
 ---
 
 ## Open questions
 
-- TUnit vs xUnit — confirm at setup time.
-- Testcontainers vs Aspire test host.
+- Testcontainers vs Aspire test host for handler integration tests.
 - How to handle `ICurrentUser` in tests — static substitution or a builder pattern.
 - Frontend tests at all? If yes, Vitest for composables, Playwright for critical user flows. Defer.
 - Coverage reporting — needed? If yes, Coverlet + ReportGenerator is the standard .NET path.

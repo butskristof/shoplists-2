@@ -134,6 +134,11 @@ Key rules:
 
 - **Property accessors**: `{ get; init; }` by default. Use `{ get; set; }` only for genuinely mutable properties.
 - **`required`** on properties that must be set at construction (Name, FKs). Exclude `Id` and properties with defaults.
+- **Self-generated identity**: aggregate roots and child entities own their identity. Initialize Id
+  properties to `<TypeId>.New()` (e.g. `public ShoplistId Id { get; init; } = ShoplistId.New();`)
+  rather than relying on EF Core to fill them in. Plays cleanly with `ValueGeneratedOnAdd` —
+  EF Core respects an assigned non-empty Guid on insert. Side benefit: entities are valid
+  immediately on construction, so domain unit tests can distinguish instances without a DB.
 - **Collection navigation**: private `List<T>` field + public `IReadOnlyList<T>` accessor. Mutate through aggregate root methods.
 - **Naming**: Use `Shoplist`, `ShoplistItem` — not `ShoppingList`. Domain-specific naming.
 

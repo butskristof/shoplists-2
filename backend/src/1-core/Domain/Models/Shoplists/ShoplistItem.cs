@@ -2,7 +2,7 @@ namespace Shoplists.Domain.Models.Shoplists;
 
 public class ShoplistItem
 {
-    public ShoplistItemId Id { get; init; }
+    public ShoplistItemId Id { get; init; } = ShoplistItemId.New();
 
     public required string Name { get; set; }
 
