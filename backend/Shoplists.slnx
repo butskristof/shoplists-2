@@ -22,6 +22,9 @@
     <Project Path="src/3-hosts/Api/Api.csproj" />
     <Project Path="src/3-hosts/DatabaseMigrator/DatabaseMigrator.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Domain.UnitTests/Domain.UnitTests.csproj" />
+    <Project Path="tests/Tests.Common/Tests.Common.csproj" />
+  </Folder>
   <Project Path="AppHost/AppHost.csproj" />
 </Solution>
