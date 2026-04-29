@@ -39,7 +39,8 @@ API which fits the bleeding-edge posture of the rest of the stack (.NET 10, Medi
 generators, StronglyTypedId). Trade-off accepted: smaller community and less agent/MCP familiarity
 than xUnit, mitigated by the fact that the framework is small and the test surface is well-defined.
 
-**Action item**: write an ADR capturing this decision now that the first test project exists.
+Captured as [ADR 014](../../decisions/014-test-framework.md) — covers framework + MTP runner
+choice, alternatives (xUnit v3 is the obvious fallback), trade-offs, and re-evaluation triggers.
 
 ### Test runner: MTP-native `dotnet test`
 
@@ -174,8 +175,9 @@ bootstrap the test project first.
    and validation helpers (no DB).
 6. **Handler integration tests** — new project + Testcontainers PostgreSQL fixture. Prove with one
    handler (e.g. `CreateShoplist` happy path + validation failure).
-7. **Write the framework + fixture ADR(s)** — TUnit decision; `dotnet test` opt-in mechanism;
-   Testcontainers vs Aspire test host (when picked).
+7. **Write the framework + fixture ADR(s)** — ~~TUnit decision; `dotnet test` opt-in mechanism~~
+   ✓ ([ADR 014](../../decisions/014-test-framework.md)). Testcontainers vs Aspire test host ADR
+   pending — write when chosen.
 8. **Extend `.github/workflows/pr-validation.yml`** with `dotnet test --solution Shoplists.slnx`
    once the suite is stable and fast enough to not block PRs.
 9. Backfill tests for existing handlers opportunistically when touching them. Don't block on a
@@ -185,6 +187,22 @@ bootstrap the test project first.
 ---
 
 ## Progress
+
+- **2026-04-29** — Domain follow-ups: aggregate-boundary + position invariant.
+  - `ShoplistTests/ItemsTests` (1 test) — pins `Items` as a read-only view: mutation through
+    `(ICollection<ShoplistItem>)sut.Items` throws `NotSupportedException`. Defends the aggregate
+    boundary against a refactor that returns the internal `List<T>` directly.
+  - `ShoplistTests/AddItemTests` — added `AddItem_AssignsContiguousPositionsFromOne(count)`
+    parametric (1, 3, 7) asserting `sut.Items.Select(i => i.Position)` is a permutation of
+    `1..count`. Closes a real gap: the existing `HasPositionMaxPlusOne` only pinned the *new*
+    item's position, so an impl that mutated existing items' positions would have passed.
+  - `ShoplistTests/RemoveItemTests` — added `RemoveItem_LeavesContiguousPositionsFromOne` (4 items,
+    mid-removal). Mostly declarative — the existing mid + last tests already pin every remaining
+    position by value; this restates the invariant explicitly.
+  - **MoveItem skipped intentionally**: the existing Down/Up tests already assert every item's
+    position after a reindex, which IS the permutation invariant. Adding a dedicated invariant
+    test would be strictly redundant.
+  - All 51 tests passing; build, CSharpier, format style, format analyzers all clean.
 
 - **2026-04-28** — Domain test bootstrap.
   - `Tests.Common` project with `ShoplistBuilder` (public sealed; implicit cast to `Shoplist`).

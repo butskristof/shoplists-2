@@ -93,4 +93,20 @@ public sealed class AddItemTests
 
         await Assert.That(item.IsFulfilled).IsFalse();
     }
+
+    [Test]
+    [Arguments(1)]
+    [Arguments(3)]
+    [Arguments(7)]
+    public async Task AddItem_AssignsContiguousPositionsFromOne(int count)
+    {
+        Shoplist sut = new ShoplistBuilder();
+
+        for (var i = 0; i < count; i++)
+            sut.AddItem($"Item {i}");
+
+        var positions = sut.Items.Select(i => i.Position);
+
+        await Assert.That(positions).IsEquivalentTo(Enumerable.Range(1, count));
+    }
 }

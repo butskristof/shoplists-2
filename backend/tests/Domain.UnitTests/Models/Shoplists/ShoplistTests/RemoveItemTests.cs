@@ -67,4 +67,20 @@ public sealed class RemoveItemTests
 
         await Assert.That(milk.Position).IsEqualTo(1);
     }
+
+    [Test]
+    public async Task RemoveItem_LeavesContiguousPositionsFromOne()
+    {
+        Shoplist sut = new ShoplistBuilder();
+        sut.AddItem("Milk");
+        var bread = sut.AddItem("Bread");
+        sut.AddItem("Eggs");
+        sut.AddItem("Cheese");
+
+        sut.RemoveItem(bread.Id);
+
+        var positions = sut.Items.Select(i => i.Position);
+
+        await Assert.That(positions).IsEquivalentTo(Enumerable.Range(1, sut.Items.Count));
+    }
 }
