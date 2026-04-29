@@ -171,8 +171,9 @@ bootstrap the test project first.
 3. ~~Opt into MTP-native `dotnet test`~~ ✓ via `backend/global.json`.
 4. **Cover `Shoplist` domain methods** — `AddItem` reference test in place; `RemoveItem`,
    `MoveItem` next. (in flight)
-5. **Application-layer / handler tests** — stand up `Application.UnitTests` for pipeline behaviours
-   and validation helpers (no DB).
+5. ~~**Application-layer / handler tests** — stand up `Application.UnitTests` for pipeline behaviours
+   and validation helpers (no DB).~~ ✓ Validation helpers + per-feature validator tests live.
+   `ValidationBehavior` unit tests deliberately deferred — see Progress entry below.
 6. **Handler integration tests** — new project + Testcontainers PostgreSQL fixture. Prove with one
    handler (e.g. `CreateShoplist` happy path + validation failure).
 7. **Write the framework + fixture ADR(s)** — ~~TUnit decision; `dotnet test` opt-in mechanism~~
@@ -187,6 +188,39 @@ bootstrap the test project first.
 ---
 
 ## Progress
+
+- **2026-04-29** — Application-layer unit tests bootstrap.
+  - `Application.UnitTests` project (added to slnx earlier) is now populated. 88 test cases across
+    12 files: `Common/Validation/FluentValidationExtensionsTests/` (3 files covering
+    `NotNullWithErrorCode`, `NotEmptyWithErrorCode`, `ValidString`) plus per-feature validator
+    tests for every use case that has a validator (8 of 9 — `GetShoplists` has no inputs).
+  - **Assertion style**: `FluentValidation.TestHelper` (`TestValidateAsync` +
+    `ShouldHaveValidationErrorFor` / `WithErrorMessage`). The package is part of the main
+    `FluentValidation` NuGet, available transitively via `FluentValidation.DependencyInjectionExtensions`
+    in Application — no new dep added. Error codes are matched via `WithErrorMessage` (not
+    `WithErrorCode`) because the rules use `WithMessage(ErrorCodes.X)`.
+  - **Internals visibility**: `Application.csproj` now exposes internals to
+    `Shoplists.Application.UnitTests` via `<InternalsVisibleTo>` so the `internal sealed` validators
+    and `BaseValidator<T>` are reachable without widening their accessibility.
+  - **Validator test conventions**: one test class per `<UseCase>.Validator`, named
+    `<UseCase>ValidatorTests.cs`, mirroring source layout (`Features/Shoplists/`,
+    `Features/Shoplists/Items/`). SUT instantiated as a private readonly field. AAA structure with
+    blank-line separators. Reuses `[NullEmptyOrWhitespaceStrings]` for string-required cases and
+    `[Arguments(...)]` for boundary integers. Validators with multiple `RuleFor`s have an
+    `AllFieldsNull` / `BothNull` test pinning class-level cascade Continue.
+  - **Cascade pinning**: `UpdateShoplistItemPositionValidatorTests.Position_Null_OnlyEmitsRequiredNotInvalid`
+    is the only test that explicitly pins `RuleLevelCascadeMode = Stop` — the only validator where
+    cascade is observable (chained `NotNull` + `GreaterThanOrEqualTo` on the same property). It
+    reaches into `result.Errors` directly and asserts a single error message rather than relying
+    on TestHelper's `.Only()`, which pins "only this property fails" not "only one error".
+  - **`ValidationBehavior` — unit tests deferred** (explicitly): every observable branch is
+    exercised by integration tests (no-validators path via `GetShoplists`, pass-through on every
+    happy path, short-circuit + `(dynamic)errors` conversion on every "invalid request" case).
+    The cleverness budget is one line, on a stable `ErrorOr` API. Revisit if (a) multiple
+    validators are ever registered for one request — currently 1:1 by source-gen — or (b) the
+    dynamic-dispatch line is refactored.
+  - All 139 tests passing (51 domain + 88 application). `dotnet build`, `dotnet csharpier check`,
+    `dotnet format style/analyzers --verify-no-changes` all clean.
 
 - **2026-04-29** — Domain follow-ups: aggregate-boundary + position invariant.
   - `ShoplistTests/ItemsTests` (1 test) — pins `Items` as a read-only view: mutation through

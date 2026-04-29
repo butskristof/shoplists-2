@@ -24,6 +24,7 @@
     <Project Path="src/3-hosts/DatabaseMigrator/DatabaseMigrator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Application.UnitTests/Application.UnitTests.csproj" />
     <Project Path="tests/Domain.UnitTests/Domain.UnitTests.csproj" />
     <Project Path="tests/Testing.Common/Testing.Common.csproj" />
   </Folder>
