@@ -100,6 +100,13 @@ adjust here when patterns evolve.
 - **Parametric data**: `[Arguments(...)]` for compile-time data, `[MethodDataSource]` for complex
   data. Use parametric tests when the cases hit the same code branch with varied inputs; split
   into separate tests when cases hit different branches.
+- **Shared test data**: when the same parametric set recurs across multiple tests
+  (null/empty/whitespace strings, boundary integers, etc.), promote it to a custom
+  `DataSourceGeneratorAttribute<T>` subclass under `Tests.Common/TestData/` with a semantic
+  attribute name (e.g. `[NullEmptyOrWhitespaceStrings]`). Reads as documentation at the call site
+  and centralises the data set when new edge cases are added. `Tests.Common` references
+  `TUnit.Core` — the library-only package — rather than the full `TUnit` meta-package, which
+  includes the runner wiring inappropriate for a shared library.
 - **Test class accessibility**: `public sealed`. Public is required by TUnit; sealed follows the
   project default ("internal sealed by default; widen to public when another project needs the
   type, drop sealed only when designed for inheritance").
@@ -181,23 +188,40 @@ bootstrap the test project first.
 
 - **2026-04-28** — Domain test bootstrap.
   - `Tests.Common` project with `ShoplistBuilder` (public sealed; implicit cast to `Shoplist`).
-  - `Domain.UnitTests` project covering `Shoplist` construction and all three mutation methods:
-    - `ConstructorTests` (1 test) — non-empty self-generated Id.
-    - `AddItemTests` (5 tests, 7 cases via `[Arguments]`) — first-position, max+1 reindex,
-      collection append, name + ShoplistId initialization, non-empty ShoplistItem Id.
-    - `RemoveItemTests` (5 tests) — unknown id throws, removal from collection, only-item edge,
-      mid-list reindex, last-item edge.
-    - `MoveItemTests` (7 tests, 8 cases) — unknown id throws, out-of-range returns, same-position
-      no-op, move-down and move-up reindex.
+  - `Domain.UnitTests` project covering `Shoplist` construction, all three mutation methods, and
+    `Name` setter validation on both entities (27 test methods, 38 cases including `[Arguments]`
+    parametrics):
+    - `ShoplistTests/ConstructorTests` (3 tests, 5 cases) — non-empty self-generated Id, name
+      validation at construction time, name trimming at construction time.
+    - `ShoplistTests/AddItemTests` (8 tests, 12 cases) — first-position, max+1 reindex, collection
+      append, name + ShoplistId initialization, non-empty ShoplistItem Id, name validation, name
+      trimming, default `IsFulfilled = false`.
+    - `ShoplistTests/RemoveItemTests` (5 tests) — unknown id throws, removal from collection,
+      only-item edge, mid-list reindex, last-item edge.
+    - `ShoplistTests/MoveItemTests` (7 tests, 8 cases) — unknown id throws, out-of-range returns,
+      same-position no-op, move-down and move-up reindex.
+    - `ShoplistTests/NameTests` (2 tests, 4 cases) — `Shoplist.Name` setter validation and
+      trimming post-construction. Pins setter behaviour against a hypothetical refactor that
+      moved validation into a constructor.
+    - `ShoplistItemTests/NameTests` (2 tests, 4 cases) — same shape for `ShoplistItem.Name`
+      (mutated through an item obtained via `Shoplist.AddItem`, since the ctor is internal).
+  - First entry under `Tests.Common/TestData/`: `[NullEmptyOrWhitespaceStrings]` attribute,
+    consumed by all four name-validation tests in place of three repeated `[Arguments]` lines.
   - Conventions agreed and documented above.
   - `backend/global.json` extended with `test.runner` to enable MTP-native `dotnet test`.
-  - Verified: `dotnet test --solution Shoplists.slnx --no-build` runs the full suite (21/21
+  - Verified: `dotnet test --solution Shoplists.slnx --no-build` runs the full suite (38/38
     passing).
-  - **Domain change** (driven by the test bootstrap): `Shoplist.Id` and `ShoplistItem.Id` now
-    self-generate via `<TypeId>.New()` initializers. Previously they defaulted to `Guid.Empty`
-    and relied on EF Core to fill in identity on insert — fine in production but unworkable in
-    domain unit tests (every in-memory item collided on Id). Convention captured in `CLAUDE.md`
-    under Domain Entity Conventions.
+  - **Domain changes** (driven by the test bootstrap):
+    - `Shoplist.Id` and `ShoplistItem.Id` now self-generate via `<TypeId>.New()` initializers.
+      Previously they defaulted to `Guid.Empty` and relied on EF Core to fill in identity on
+      insert — fine in production but unworkable in domain unit tests (every in-memory item
+      collided on Id).
+    - `Shoplist.Name` and `ShoplistItem.Name` use C# 14 `field`-backed setters with
+      `ArgumentException.ThrowIfNullOrWhiteSpace(value)` and store the trimmed canonical value.
+      Defense in depth alongside FluentValidation at the App layer.
+    - `ShoplistItem` parameterless constructor is now `internal` — child entities can only be
+      created from inside the Domain assembly. External callers go through `Shoplist.AddItem(...)`.
+    - All three conventions captured in `CLAUDE.md` under Domain Entity Conventions.
   - **Outstanding**: `global.json` is not yet listed under `Solution Items` in `Shoplists.slnx`.
     The dotnet CLI's `dotnet sln add` only accepts projects, not loose files — adding it requires
     a manual slnx edit. Decide whether to add it (IDE-visibility convenience) or leave it

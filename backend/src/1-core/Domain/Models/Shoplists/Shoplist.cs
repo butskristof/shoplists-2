@@ -6,7 +6,15 @@ public class Shoplist
 {
     public ShoplistId Id { get; init; } = ShoplistId.New();
 
-    public required string Name { get; set; }
+    public required string Name
+    {
+        get;
+        set
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value);
+            field = value.Trim();
+        }
+    }
 
     public required UserId OwnerId { get; init; }
 

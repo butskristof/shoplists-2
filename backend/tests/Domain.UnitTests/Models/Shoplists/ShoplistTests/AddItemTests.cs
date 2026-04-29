@@ -1,5 +1,6 @@
 using Shoplists.Domain.Models.Shoplists;
 using Shoplists.Tests.Common.Builders.Shoplists;
+using Shoplists.Tests.Common.TestData;
 
 namespace Shoplists.Domain.UnitTests.Models.Shoplists.ShoplistTests;
 
@@ -62,5 +63,34 @@ public sealed class AddItemTests
         var item = sut.AddItem("Milk");
 
         await Assert.That(item.Id).IsNotEqualTo(ShoplistItemId.Empty);
+    }
+
+    [Test]
+    [NullEmptyOrWhitespaceStrings]
+    public async Task AddItem_NullOrWhitespaceName_ThrowsArgumentException(string? name)
+    {
+        Shoplist sut = new ShoplistBuilder();
+
+        await Assert.That(() => sut.AddItem(name!)).Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task AddItem_NameWithSurroundingWhitespace_StoresTrimmedName()
+    {
+        Shoplist sut = new ShoplistBuilder();
+
+        var item = sut.AddItem("  Milk  ");
+
+        await Assert.That(item.Name).IsEqualTo("Milk");
+    }
+
+    [Test]
+    public async Task AddItem_NewItem_IsNotFulfilledByDefault()
+    {
+        Shoplist sut = new ShoplistBuilder();
+
+        var item = sut.AddItem("Milk");
+
+        await Assert.That(item.IsFulfilled).IsFalse();
     }
 }
