@@ -9,7 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\1-core\Domain\Domain.csproj" />
-    <ProjectReference Include="..\Tests.Common\Tests.Common.csproj" />
+    <ProjectReference Include="..\Testing.Common\Testing.Common.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="TUnit" />

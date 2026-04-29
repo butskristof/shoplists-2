@@ -1,7 +1,7 @@
 using Shoplists.Domain.Models.Shoplists;
 using Shoplists.Domain.Models.Users;
 
-namespace Shoplists.Tests.Common.Builders.Shoplists;
+namespace Shoplists.Testing.Common.Builders.Shoplists;
 
 public sealed class ShoplistBuilder
 {

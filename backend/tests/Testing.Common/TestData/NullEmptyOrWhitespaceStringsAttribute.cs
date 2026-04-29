@@ -1,4 +1,4 @@
-namespace Shoplists.Tests.Common.TestData;
+namespace Shoplists.Testing.Common.TestData;
 
 public sealed class NullEmptyOrWhitespaceStringsAttribute : DataSourceGeneratorAttribute<string?>
 {

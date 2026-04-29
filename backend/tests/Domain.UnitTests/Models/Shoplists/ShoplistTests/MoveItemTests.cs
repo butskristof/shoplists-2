@@ -1,5 +1,5 @@
 using Shoplists.Domain.Models.Shoplists;
-using Shoplists.Tests.Common.Builders.Shoplists;
+using Shoplists.Testing.Common.Builders.Shoplists;
 
 namespace Shoplists.Domain.UnitTests.Models.Shoplists.ShoplistTests;
 

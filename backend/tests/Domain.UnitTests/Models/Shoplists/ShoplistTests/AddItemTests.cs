@@ -1,6 +1,6 @@
 using Shoplists.Domain.Models.Shoplists;
-using Shoplists.Tests.Common.Builders.Shoplists;
-using Shoplists.Tests.Common.TestData;
+using Shoplists.Testing.Common.Builders.Shoplists;
+using Shoplists.Testing.Common.TestData;
 
 namespace Shoplists.Domain.UnitTests.Models.Shoplists.ShoplistTests;
 
