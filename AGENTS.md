@@ -134,6 +134,22 @@ Key rules:
 
 - **Property accessors**: `{ get; init; }` by default. Use `{ get; set; }` only for genuinely mutable properties.
 - **`required`** on properties that must be set at construction (Name, FKs). Exclude `Id` and properties with defaults.
+- **Self-generated identity**: aggregate roots and child entities own their identity. Initialize Id
+  properties to `<TypeId>.New()` (e.g. `public ShoplistId Id { get; init; } = ShoplistId.New();`)
+  rather than relying on EF Core to fill them in. Plays cleanly with `ValueGeneratedOnAdd` —
+  EF Core respects an assigned non-empty Guid on insert. Side benefit: entities are valid
+  immediately on construction, so domain unit tests can distinguish instances without a DB.
+- **Self-validating input**: domain methods and property setters guard against bad input shape
+  using BCL throw helpers (e.g. `ArgumentException.ThrowIfNullOrWhiteSpace(value)`); strings are
+  canonicalised (`Trim()`) on the way in. Use C# 14 `field`-backed setters when validation must
+  fire on every assignment, not just at construction. App-layer FluentValidation rules remain the
+  primary user-facing check (uniform `ValidationProblemDetails`); domain guards are defense in
+  depth and should never fire from a well-formed handler call.
+- **Aggregate boundary on construction**: child entities have an `internal` parameterless
+  constructor (e.g. `internal ShoplistItem() { }`); they can only be created by the aggregate root
+  or other Domain-assembly code. External layers (Application, Persistence) reference the type
+  but must go through aggregate methods like `shoplist.AddItem(...)`. EF Core materialises via
+  reflection regardless of constructor accessibility.
 - **Collection navigation**: private `List<T>` field + public `IReadOnlyList<T>` accessor. Mutate through aggregate root methods.
 - **Naming**: Use `Shoplist`, `ShoplistItem` — not `ShoppingList`. Domain-specific naming.
 

@@ -41,3 +41,4 @@ jobs:
       - run: dotnet format style --no-restore --verify-no-changes
       - run: dotnet format analyzers --no-restore --verify-no-changes
       - run: dotnet build --no-restore
+      - run: dotnet test --solution Shoplists.slnx --no-build
