@@ -211,6 +211,22 @@ Generate: `cd backend/src/2-infrastructure/Persistence && dotnet ef migrations a
 
 See ADR 005 for runner implementation notes.
 
+### Aspire Version Upgrades
+
+Use the Aspire CLI for all Aspire version bumps — it's the only path that keeps
+the `Aspire.AppHost.Sdk/X.Y.Z` SDK line in `AppHost.csproj` in lockstep with the
+`Aspire.*` package versions in `Directory.Packages.props`. Manual / Rider-driven
+bumps miss the SDK line.
+
+```bash
+aspire update --self                              # update the CLI first
+aspire update --apphost backend/AppHost/AppHost.csproj \
+              --channel stable --nuget-config-dir backend -y
+```
+
+Non-Aspire packages (EF Core, Mediator, etc.) are upgraded separately. See ADR
+015 for the full procedure and trade-offs.
+
 ### Other Backend Rules
 
 - **Type accessibility**: New types are `internal sealed` by default. Widen to `public` only when
