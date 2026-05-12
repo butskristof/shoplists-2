@@ -10,7 +10,7 @@ internal sealed class ShoplistConfiguration : IEntityTypeConfiguration<Shoplist>
     public void Configure(EntityTypeBuilder<Shoplist> builder)
     {
         builder.HasKey(sl => sl.Id);
-        builder.Property(sl => sl.Id).ValueGeneratedOnAdd();
+        builder.Property(sl => sl.Id).ValueGeneratedNever();
 
         builder.Property(sl => sl.Name).IsRequired();
 
