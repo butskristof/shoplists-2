@@ -136,9 +136,11 @@ Key rules:
 - **`required`** on properties that must be set at construction (Name, FKs). Exclude `Id` and properties with defaults.
 - **Self-generated identity**: aggregate roots and child entities own their identity. Initialize Id
   properties to `<TypeId>.New()` (e.g. `public ShoplistId Id { get; init; } = ShoplistId.New();`)
-  rather than relying on EF Core to fill them in. Plays cleanly with `ValueGeneratedOnAdd` —
-  EF Core respects an assigned non-empty Guid on insert. Side benefit: entities are valid
-  immediately on construction, so domain unit tests can distinguish instances without a DB.
+  rather than relying on EF Core to fill them in. Pair this with `ValueGeneratedNever()` on the
+  key in the entity configuration (NOT `ValueGeneratedOnAdd()`) — when EF Core thinks the key is
+  store-generated but finds a non-default value, it assumes the entity already exists and emits
+  `UPDATE` instead of `INSERT` for nav-collection adds (see ADR 016). Side benefit: entities are
+  valid immediately on construction, so domain unit tests can distinguish instances without a DB.
 - **Self-validating input**: domain methods and property setters guard against bad input shape
   using BCL throw helpers (e.g. `ArgumentException.ThrowIfNullOrWhiteSpace(value)`); strings are
   canonicalised (`Trim()`) on the way in. Use C# 14 `field`-backed setters when validation must
@@ -169,7 +171,7 @@ All entities use strongly-typed IDs via `StronglyTypedId` source generator.
 
 ### EF Core Configuration
 
-- Always explicit: `HasKey`, `ValueGeneratedOnAdd`, `IsRequired` on strings
+- Always explicit: `HasKey`, `ValueGeneratedNever` (the domain assigns the Id — see "Self-generated identity" above), `IsRequired` on strings
 - Default max string length via `ConfigureConventions` (512). Override per-property if needed.
 - Use `IsImmutableAfterInsert()` extension on non-key properties that must never change (e.g., `OwnerId`, parent FKs). Do NOT apply to PKs.
 

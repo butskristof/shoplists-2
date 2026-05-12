@@ -17,7 +17,7 @@ namespace Shoplists.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.5")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -25,7 +25,6 @@ namespace Shoplists.Persistence.Migrations
             modelBuilder.Entity("Shoplists.Domain.Models.Shoplists.Shoplist", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<string>("Name")
@@ -48,7 +47,6 @@ namespace Shoplists.Persistence.Migrations
             modelBuilder.Entity("Shoplists.Domain.Models.Shoplists.ShoplistItem", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsFulfilled")

@@ -13,7 +13,7 @@ internal static class PropertyBuilderExtensions
     ///
     /// Use this for non-key properties that should never change after creation
     /// (e.g., <c>OwnerId</c>, foreign keys to parent aggregates).
-    /// Key properties already have this behavior by default via <c>ValueGeneratedOnAdd</c>.
+    /// Key properties already have this behavior by default.
     /// </summary>
     internal static PropertyBuilder<TProperty> IsImmutableAfterInsert<TProperty>(
         this PropertyBuilder<TProperty> builder
