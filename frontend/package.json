@@ -43,7 +43,9 @@
     "eslint-plugin-format": "^2.0.1",
     "openapi-typescript": "^7.13.0"
   },
+  "//overrides": "Each entry below patches a transitively-pulled vulnerable dep. See docs/security/overrides.md for advisory IDs, parent deps, and removal conditions. Review on every npm audit / deps-upgrade pass.",
   "overrides": {
+    "protobufjs": "^8.0.3",
     "serialize-javascript": "^7.0.5"
   }
 }

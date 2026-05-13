@@ -352,6 +352,22 @@ revisit if Aspire's dynamic ports break it.
 
 ---
 
+## Dependency Security Overrides
+
+`frontend/package.json` uses npm `overrides` to patch known-vulnerable transitive deps. 
+Policy: ADR 017. Registry of current entries withadvisory IDs, parent deps, and removal 
+conditions: `docs/security/overrides.md`.
+
+**Review trigger** — every `npm audit` cleanup or deps-upgrade pass: re-read the registry,
+and for each entry temporarily remove the override, run `npm install` + `npm audit`, and
+remove the entry (in both `package.json` and the registry) if it's no longer load-bearing.
+Never run `npm audit fix --force` — it can silently downgrade direct deps. See ADR 017.
+
+When adding a new override, write the registry entry in the same change and update the
+`"//overrides"` breadcrumb at the top of the overrides block if the description drifts.
+
+---
+
 ## Validation Commands
 
 **Frontend** (run from `frontend/`):
