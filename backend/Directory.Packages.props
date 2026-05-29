@@ -30,7 +30,7 @@
     <PackageVersion Include="Scalar.AspNetCore" Version="2.14.11" />
     <PackageVersion Include="StronglyTypedId" Version="1.0.0-beta08" />
     <PackageVersion Include="StronglyTypedId.Templates" Version="1.0.0-beta08" />
-    <PackageVersion Include="TUnit" Version="1.44.0" />
+    <PackageVersion Include="TUnit" Version="1.47.0" />
     <PackageVersion Include="TUnit.Core" Version="1.44.0" />
   </ItemGroup>
 </Project>
