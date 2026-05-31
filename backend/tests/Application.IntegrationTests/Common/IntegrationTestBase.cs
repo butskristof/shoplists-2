@@ -11,30 +11,36 @@ public abstract class IntegrationTestBase
     public required ApplicationFixture Fixture { get; init; }
 
     // TUnit creates a fresh instance of the test class per [Test] method, so these initializers
-    // run anew for every test. No reset hook required.
-    public UserId CurrentUserId { get; private set; } = NewTestUserId();
+    // run anew for every test. CurrentUserId is the ambient default actor; pass asUser to SendAsync
+    // to run a single operation as a different user.
+    public UserId CurrentUserId { get; } = NewTestUserId();
     public FakeTimeProvider TimeProvider { get; } = new();
-
-    public void SetUserId(UserId userId) => CurrentUserId = userId;
 
     public void SetUtcNow(DateTimeOffset value) => TimeProvider.SetUtcNow(value);
 
     public static UserId NewTestUserId() => new(Guid.NewGuid().ToString());
 
-    public ValueTask<TResponse> SendAsync<TResponse>(IRequest<TResponse> request) =>
-        ExecuteInScopeAsync(sender => sender.Send(request));
+    public ValueTask<TResponse> SendAsync<TResponse>(
+        IRequest<TResponse> request,
+        UserId? asUser = null
+    ) => ExecuteInScopeAsync(asUser, sender => sender.Send(request));
 
-    public ValueTask<TResponse> SendAsync<TResponse>(ICommand<TResponse> command) =>
-        ExecuteInScopeAsync(sender => sender.Send(command));
+    public ValueTask<TResponse> SendAsync<TResponse>(
+        ICommand<TResponse> command,
+        UserId? asUser = null
+    ) => ExecuteInScopeAsync(asUser, sender => sender.Send(command));
 
-    public ValueTask<TResponse> SendAsync<TResponse>(IQuery<TResponse> query) =>
-        ExecuteInScopeAsync(sender => sender.Send(query));
+    public ValueTask<TResponse> SendAsync<TResponse>(
+        IQuery<TResponse> query,
+        UserId? asUser = null
+    ) => ExecuteInScopeAsync(asUser, sender => sender.Send(query));
 
     private async ValueTask<TResponse> ExecuteInScopeAsync<TResponse>(
+        UserId? asUser,
         Func<ISender, ValueTask<TResponse>> dispatch
     )
     {
-        using var scope = Fixture.CreateScopeFor(CurrentUserId, TimeProvider);
+        using var scope = Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider);
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         return await dispatch(sender);
     }

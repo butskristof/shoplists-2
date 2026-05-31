@@ -62,8 +62,10 @@ Three coupled choices:
    `TestCurrentUser` (also scoped, matching production lifetime) takes it as a constructor
    dependency and exposes its `UserId`. The test base class — which owns per-test state as
    ordinary instance fields — populates the context immediately after creating each operation's
-   scope. Tests change the acting user mid-test by calling `SetUserId(...)` on the base; the
-   change is observable on the next `SendAsync` call. No `AsyncLocal`, no TUnit-specific value
+   scope. Each test runs as an ambient default `CurrentUserId` (a fresh id per test instance); to
+   act as a different user, a test passes `asUser:` to `SendAsync`, which overrides the user for
+   that single operation's scope. There is no mutable "current actor" to track — the default is
+   read-only and deviations are local to the call. No `AsyncLocal`, no TUnit-specific value
    propagation — TUnit creates a fresh test class instance per `[Test]` method, so per-test
    instance fields are naturally isolated for parallel execution.
 
@@ -76,10 +78,11 @@ Two classes split the concerns cleanly:
   exposes one method for tests to use the system: `CreateScopeFor(UserId, FakeTimeProvider)`,
   which produces a DI scope primed so that `ICurrentUser` and `TimeProvider` resolve to the
   passed values inside that scope.
-- **`IntegrationTestBase`** (per-test, abstract) holds the current `UserId` and `FakeTimeProvider`
-  as instance fields, exposes `SetUserId` / `SetUtcNow` / `CurrentUserId` / `TimeProvider`
-  helpers, and provides `SendAsync` overloads. It does not know about the scope-priming mechanism
-  — it just calls `Fixture.CreateScopeFor(CurrentUserId, TimeProvider)`.
+- **`IntegrationTestBase`** (per-test, abstract) holds the ambient-default `CurrentUserId`
+  (read-only) and `FakeTimeProvider` as instance fields, exposes `SetUtcNow` / `CurrentUserId` /
+  `TimeProvider` helpers, and provides `SendAsync` overloads with an optional `asUser` parameter.
+  It does not know about the scope-priming mechanism — it just calls
+  `Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider)`.
 - **`TestScopeContext`** is an internal scoped DI service inside the fixture that carries the
   per-test state into each scope. Only the fixture's `CreateScopeFor` method writes to it; the
   test base never imports the type.
@@ -113,11 +116,12 @@ public IServiceScope CreateScopeFor(UserId userId, FakeTimeProvider timeProvider
     return scope;
 }
 
-// IntegrationTestBase — dispatch helper:
+// IntegrationTestBase — dispatch helper (asUser overrides the ambient default for one operation):
 private async ValueTask<TResponse> ExecuteInScopeAsync<TResponse>(
+    UserId? asUser,
     Func<ISender, ValueTask<TResponse>> dispatch)
 {
-    using var scope = Fixture.CreateScopeFor(CurrentUserId, TimeProvider);
+    using var scope = Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider);
     var sender = scope.ServiceProvider.GetRequiredService<ISender>();
     return await dispatch(sender);
 }
@@ -193,9 +197,10 @@ tests from accidentally relying on tracked entities bleeding between arrange/act
   to thousands of tests, add a teardown step to truncate or recreate the database between
   assembly runs.
 
-- **`SetUserId` is observable on the next `SendAsync`, not mid-flight within a single request.**
-  The test base writes the current state into the scope's `TestScopeContext` once, immediately
-  after creating the scope. No realistic test would want mid-request user switching anyway.
+- **The acting user is fixed per operation, not switchable mid-request.** The test base writes the
+  user (the ambient `CurrentUserId`, or an `asUser:` override) into the scope's `TestScopeContext`
+  once, immediately after creating the scope. No realistic test would want mid-request user
+  switching anyway.
 
 - **Aspire enrichment runs in tests.** `EnrichNpgsqlDbContext` registers Npgsql resilience
   policies, health checks, and OTel instrumentation. Health checks register without endpoints;
@@ -219,18 +224,20 @@ tests from accidentally relying on tracked entities bleeding between arrange/act
   fixture init. Same entry point as the production `DatabaseMigrator` worker — no parallel
   migration mechanism.
 - **Per-operation scope + folded `SendAsync`**: three public overloads on `IntegrationTestBase`
-  (`IRequest<T>`, `ICommand<T>`, `IQuery<T>`) each delegate to a single private
-  `ExecuteInScopeAsync<TResponse>(Func<ISender, ValueTask<TResponse>> dispatch)` helper that
-  creates the scope, populates `TestScopeContext` with the current `UserId` + `TimeProvider`,
-  resolves `ISender`, and invokes the callback. The split into overloads is required because
+  (`IRequest<T>`, `ICommand<T>`, `IQuery<T>`, each taking an optional `asUser`) each delegate to a
+  single private `ExecuteInScopeAsync<TResponse>(UserId? asUser, Func<ISender, ValueTask<TResponse>>
+  dispatch)` helper that creates the scope, populates `TestScopeContext` with the resolved `UserId`
+  (`asUser ?? CurrentUserId`) + `TimeProvider`, resolves `ISender`, and invokes the callback. The
+  split into overloads is required because
   Mediator's `IRequest<T>` / `ICommand<T>` / `IQuery<T>` are sibling interfaces, not a hierarchy.
 - **Per-test state via instance fields, no reset hook**: `IntegrationTestBase` declares
   `CurrentUserId` and `TimeProvider` as instance properties initialized inline
   (`= NewTestUserId()` / `= new FakeTimeProvider()`). TUnit creates a fresh test class instance
   per `[Test]` method, so the initializers run anew for every test. Schema state is intentionally
   *not* reset.
-- **Cross-user assertions**: tests call `SetUserId(...)` between operations to act as different
-  users. The initial spike includes a cross-user test that pins the user-scoping invariant.
+- **Cross-user assertions**: tests pass `asUser:` to `SendAsync` to run an operation as a
+  different user; the ambient `CurrentUserId` is the implicit default for every other call. The
+  initial spike includes a cross-user test that pins the user-scoping invariant.
 - **`TimeProvider`**: registered via the scoped `TestScopeContext.TimeProvider` (always a
   `FakeTimeProvider`). No production handler reads it today, but the application layer already
   injects `TimeProvider` where relevant, so the fixture is ready when time-dependent features land.
@@ -260,8 +267,9 @@ The first integration test PR covers `CreateShoplist` with three tests, in this 
 2. **Validation failure** — null `Name`, assert `ErrorOr.IsError == true` and
    `FirstError.Type == ErrorType.Validation`. Pins `ValidationBehavior` short-circuit through the
    real pipeline.
-3. **Cross-user isolation** — user A creates a shoplist; switch to user B; `GetShoplists` returns
-   empty. Pins the user-scoping invariant that the whole DB strategy depends on.
+3. **Cross-user isolation** — the ambient default user creates a shoplist; a second user
+   (`asUser:`) calls `GetShoplists` and gets an empty result. Pins the user-scoping invariant that
+   the whole DB strategy depends on.
 
 CI is already wired: `dotnet test --solution Shoplists.slnx --no-build` runs in
 `.github/workflows/pr-validation.yml` and picks up the new project automatically via slnx.

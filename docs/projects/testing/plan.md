@@ -190,6 +190,23 @@ bootstrap the test project first.
 
 ## Progress
 
+- **2026-05-31** — Integration test user-acting surface simplified to a per-send override.
+  - Replaced the mutable `SetUserId(...)` / `private set` `CurrentUserId` pair with a read-only
+    ambient-default `CurrentUserId` (still a fresh id per test instance) plus an optional
+    `asUser` parameter on every `SendAsync` overload (`asUser ?? CurrentUserId` inside the
+    dispatch helper). Single-user tests stay zero-ceremony (never mention a user); cross-user
+    tests express the deviation locally and immutably at the call site instead of juggling an
+    ambient "current actor" across statements.
+  - Cross-user test renamed `Shoplist_IsNotVisibleToOtherUsers` — the old `...ByUserA...UserB`
+    name implied an A/B notion the code no longer carries; there's just the default user and
+    `asUser:` for another.
+  - `TestScopeContext` / `CreateScopeFor` channel unchanged — `asUser` flows into the existing
+    `userId` argument. [ADR 018](../../decisions/018-backend-integration-test-architecture.md)
+    updated in place (choice 3, composition shape, trade-offs, impl notes, spike).
+  - **Still parked** for a follow-up pass: the three `SendAsync` overloads + the
+    `ExecuteInScopeAsync` callback indirection, and dropping the dead `IRequest<T>` overload (no
+    handler uses it — all are `ICommand`/`IQuery`). Doc/ADR update for those lands with that pass.
+
 - **2026-05-15** — Handler integration test architecture decided and shipped.
   - Architecture session worked through the three coupled choices (boundary, DB strategy,
     `ICurrentUser` substitution) and resulting fixture shape. Outcome captured in
