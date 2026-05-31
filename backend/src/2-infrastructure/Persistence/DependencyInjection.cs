@@ -8,17 +8,32 @@ namespace Shoplists.Persistence;
 
 public static class DependencyInjection
 {
+    // Callers should always specify exactly one of connectionName or connectionString by name:
+    //   builder.AddPersistence(connectionName: Resources.AppDb)        // production hosts
+    //   builder.AddPersistence(connectionString: container.GetConnectionString())  // tests
     public static IHostApplicationBuilder AddPersistence(
         this IHostApplicationBuilder builder,
-        string connectionName
+        string? connectionName = null,
+        string? connectionString = null
     )
     {
+        if ((connectionName is null) == (connectionString is null))
+            throw new ArgumentException(
+                "Provide exactly one of connectionName or connectionString.",
+                nameof(connectionName)
+            );
+
+        var resolved =
+            connectionString ?? builder.Configuration.GetConnectionString(connectionName!);
+        if (string.IsNullOrEmpty(resolved))
+            throw new InvalidOperationException(
+                $"Connection string '{connectionName}' was not found in configuration."
+            );
+
         // Register with AddDbContext (not AddDbContextPool) because AppDbContext has a scoped
         // constructor dependency (ICurrentUser). DbContext pooling uses a singleton pool that
         // cannot resolve scoped services.
-        builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(builder.Configuration.GetConnectionString(connectionName))
-        );
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(resolved));
 
         // Add Aspire's health check, retry, and telemetry on top of the manually registered context.
         builder.EnrichNpgsqlDbContext<AppDbContext>();

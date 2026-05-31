@@ -1,0 +1,55 @@
+using ErrorOr;
+using Shoplists.Application.Features.Shoplists;
+using Shoplists.Application.IntegrationTests.Common;
+
+namespace Shoplists.Application.IntegrationTests.Features.Shoplists;
+
+public sealed class CreateShoplistTests : IntegrationTestBase
+{
+    [Test]
+    public async Task ValidRequest_PersistsShoplist_AndReturnsId()
+    {
+        var request = new CreateShoplist.Request("Groceries");
+
+        var result = await SendAsync(request);
+
+        await Assert.That(result.IsError).IsFalse();
+        var shoplistsResult = await SendAsync(new GetShoplists.Request());
+        await Assert.That(shoplistsResult.IsError).IsFalse();
+        var shoplists = shoplistsResult.Value;
+        await Assert.That(shoplists.Count).IsEqualTo(1);
+        await Assert.That(shoplists[0].Id).IsEqualTo(result.Value.Id);
+        await Assert.That(shoplists[0].Name).IsEqualTo("Groceries");
+    }
+
+    [Test]
+    public async Task NullName_ShortCircuitsValidation_AndPersistsNothing()
+    {
+        var request = new CreateShoplist.Request(null);
+
+        var result = await SendAsync(request);
+
+        await Assert.That(result.IsError).IsTrue();
+        await Assert.That(result.FirstError.Type).IsEqualTo(ErrorType.Validation);
+
+        var shoplistsResult = await SendAsync(new GetShoplists.Request());
+        await Assert.That(shoplistsResult.IsError).IsFalse();
+        await Assert.That(shoplistsResult.Value.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ShoplistCreatedByUserA_IsNotVisibleToUserB()
+    {
+        var userA = NewTestUserId();
+        var userB = NewTestUserId();
+
+        SetUserId(userA);
+        var createResult = await SendAsync(new CreateShoplist.Request("A's list"));
+        await Assert.That(createResult.IsError).IsFalse();
+
+        SetUserId(userB);
+        var shoplistsResult = await SendAsync(new GetShoplists.Request());
+        await Assert.That(shoplistsResult.IsError).IsFalse();
+        await Assert.That(shoplistsResult.Value.Count).IsEqualTo(0);
+    }
+}
