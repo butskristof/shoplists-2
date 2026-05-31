@@ -23,9 +23,10 @@ public static class DependencyInjection
                 nameof(connectionName)
             );
 
-        var resolved =
-            connectionString ?? builder.Configuration.GetConnectionString(connectionName!);
-        if (string.IsNullOrEmpty(resolved))
+        // replace null connection string with value retrieved from configuration if not
+        // passed in explicitly
+        connectionString ??= builder.Configuration.GetConnectionString(connectionName!);
+        if (string.IsNullOrEmpty(connectionString))
             throw new InvalidOperationException(
                 $"Connection string '{connectionName}' was not found in configuration."
             );
@@ -33,7 +34,7 @@ public static class DependencyInjection
         // Register with AddDbContext (not AddDbContextPool) because AppDbContext has a scoped
         // constructor dependency (ICurrentUser). DbContext pooling uses a singleton pool that
         // cannot resolve scoped services.
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(resolved));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
         // Add Aspire's health check, retry, and telemetry on top of the manually registered context.
         builder.EnrichNpgsqlDbContext<AppDbContext>();
