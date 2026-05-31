@@ -13,7 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\2-infrastructure\ServiceDefaults\ServiceDefaults.csproj" IsAspireProjectResource="false" />
+    <ProjectReference
+      Include="..\src\2-infrastructure\ServiceDefaults\ServiceDefaults.csproj"
+      IsAspireProjectResource="false"
+    />
     <ProjectReference Include="..\src\3-hosts\Api\Api.csproj" />
     <ProjectReference Include="..\src\3-hosts\DatabaseMigrator\DatabaseMigrator.csproj" />
   </ItemGroup>
