@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.3.1">
+<Project Sdk="Aspire.AppHost.Sdk/13.3.5">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <UserSecretsId>e4f461b9-ca42-4c11-82eb-45daaf25980c</UserSecretsId>
@@ -13,10 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference
-      Include="..\src\2-infrastructure\ServiceDefaults\ServiceDefaults.csproj"
-      IsAspireProjectResource="false"
-    />
+    <ProjectReference Include="..\src\2-infrastructure\ServiceDefaults\ServiceDefaults.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\src\3-hosts\Api\Api.csproj" />
     <ProjectReference Include="..\src\3-hosts\DatabaseMigrator\DatabaseMigrator.csproj" />
   </ItemGroup>
