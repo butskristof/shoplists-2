@@ -12,7 +12,10 @@ var valkey = builder.AddValkey(Resources.Valkey).WithDataVolume().WithPersistenc
 #region Database
 
 // No WithPersistence() needed — unlike Valkey/Redis, PostgreSQL writes to disk by default (WAL).
-var postgres = builder.AddPostgres(Resources.Postgres).WithDataVolume();
+// Image tag pinned explicitly (rather than relying on Aspire's default) so integration tests can
+// match the exact engine version. Keep in sync with the PostgreSqlBuilder image tag in
+// tests/Application.IntegrationTests/Common/ApplicationFixture.cs.
+var postgres = builder.AddPostgres(Resources.Postgres).WithImageTag("17.6").WithDataVolume();
 var appDb = postgres.AddDatabase(Resources.AppDb);
 
 // Dedicated worker that applies EF Core migrations and exits.

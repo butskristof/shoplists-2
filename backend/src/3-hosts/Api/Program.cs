@@ -12,7 +12,7 @@ builder.AddServiceDefaults();
 builder.Services.AddConfiguration(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure();
-builder.AddPersistence(Resources.AppDb);
+builder.AddPersistence(connectionName: Resources.AppDb);
 builder.Services.AddApi(builder.Configuration);
 
 var app = builder.Build();

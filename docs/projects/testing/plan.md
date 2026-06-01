@@ -135,16 +135,13 @@ endpoint logic ever grows beyond `sender.Send(...).ToHttpResult()`.
 
 ## Test database strategy
 
-Open question. Options:
-
-- **Testcontainers PostgreSQL** — one container per test run, fresh DB, fast with layer caching.
-  Standard approach.
-- **Aspire distributed application testing** — spin up the real AppHost in a test host. Closer to
-  production shape, more setup, slower.
-- **In-memory provider / SQLite** — rejected. Behavioural drift from real PostgreSQL (JSON, case
-  sensitivity, concurrency) would undermine the whole point.
-
-Lean: Testcontainers. Revisit if Aspire test host proves ergonomic enough.
+Resolved — **Testcontainers PostgreSQL with user-scoped isolation**, one container per assembly
+run, migrations applied once via `DatabaseMigrationRunner`, no per-test cleanup. Each test gets a
+fresh `UserId`; the production `OwnerId` filter (`dbContext.CurrentUserShoplists()`) provides
+isolation between tests as a side effect of the existing authorization design. Full alternatives
+analysis (WebApplicationFactory, Aspire distributed test host, Respawn, per-test transaction
+rollback, template-DB cloning, in-memory provider) in
+[ADR 018](../../decisions/018-backend-integration-test-architecture.md).
 
 ---
 
@@ -174,20 +171,131 @@ bootstrap the test project first.
 5. ~~**Application-layer / handler tests** — stand up `Application.UnitTests` for pipeline behaviours
    and validation helpers (no DB).~~ ✓ Validation helpers + per-feature validator tests live.
    `ValidationBehavior` unit tests deliberately deferred — see Progress entry below.
-6. **Handler integration tests** — new project + Testcontainers PostgreSQL fixture. Prove with one
-   handler (e.g. `CreateShoplist` happy path + validation failure).
-7. **Write the framework + fixture ADR(s)** — ~~TUnit decision; `dotnet test` opt-in mechanism~~
-   ✓ ([ADR 014](../../decisions/014-test-framework.md)). Testcontainers vs Aspire test host ADR
-   pending — write when chosen.
-8. **Extend `.github/workflows/pr-validation.yml`** with `dotnet test --solution Shoplists.slnx`
-   once the suite is stable and fast enough to not block PRs.
-9. Backfill tests for existing handlers opportunistically when touching them. Don't block on a
-   coverage pass.
-10. Adopt TDD-first for new handlers going forward.
+6. **Handler integration tests** (in progress) — new `Application.IntegrationTests` project with
+   a Testcontainers PostgreSQL fixture rooted at the mediator boundary. Prove with `CreateShoplist`
+   (happy path + validation failure + cross-user isolation). Architecture captured in
+   [ADR 018](../../decisions/018-backend-integration-test-architecture.md).
+7. ~~**Write the framework + fixture ADR(s)**~~ ✓ Two ADRs:
+   [ADR 014](../../decisions/014-test-framework.md) (TUnit + MTP runner) and
+   [ADR 018](../../decisions/018-backend-integration-test-architecture.md) (integration test
+   architecture: boundary, DB strategy, `ICurrentUser` substitution).
+8. ~~**Extend `.github/workflows/pr-validation.yml`**~~ ✓ Already wired —
+   `dotnet test --solution Shoplists.slnx --no-build` picks up new test projects automatically
+   via slnx; GitHub-hosted `ubuntu-latest` runners ship with Docker for Testcontainers.
+9. ~~Backfill tests for existing handlers.~~ ✓ Done as a deliberate pass (2026-06-02) rather than
+   opportunistically — all ten handlers now have integration coverage. See Progress entry.
+10. Adopt TDD-first for new handlers going forward. **← now the active mode.**
 
 ---
 
 ## Progress
+
+- **2026-06-02** — Integration coverage backfilled across all existing handlers + direct-DB escape
+  hatch added.
+  - Went past the `CreateShoplist` spike to cover every handler: `GetShoplists`, `GetShoplist`,
+    `UpdateShoplist`, `DeleteShoplist`, and all five item handlers (`CreateShoplistItem`,
+    `UpdateShoplistItem`, `UpdateShoplistItemFulfilled`, `UpdateShoplistItemPosition`,
+    `DeleteShoplistItem`). One file per use case, item handlers nested under `Features/Shoplists/Items/`
+    mirroring source. ~32 new tests (≈43 total). All green; CI picks them up via slnx.
+  - **Infra — direct DB access for arrange/assert.** Some scenarios can't go through the mediator
+    surface: seeding out-of-order positions or other users' data, and *verifying* state no handler
+    can observe (the cascade-delete proof — after a list is deleted, no query can reach its orphaned
+    items). Added:
+    - `InternalsVisibleTo("Shoplists.Application.IntegrationTests")` on `Persistence.csproj` so tests
+      can resolve the concrete (internal) `AppDbContext` and reach `Set<ShoplistItem>()` (unreachable
+      via `IAppDbContext`, which exposes only `Shoplists` + `CurrentUserShoplists()`). Sanctioned
+      test-only access; the production rule (external code uses `IAppDbContext`) still holds.
+    - `ExecuteDbAsync(Func<AppDbContext, ValueTask>[, asUser])` + `<TResult>` overload on
+      `IntegrationTestBase` — fresh scope per call (mirrors `SendAsync`), so reads reflect committed
+      state with no change-tracker bleed. `private protected` because it surfaces the internal
+      `AppDbContext` from a public base. Access is UNFILTERED (`Set<T>()` / `Shoplists` bypass the
+      `OwnerId` filter, which lives only in `CurrentUserShoplists()`); `asUser` priming just satisfies
+      the ctor.
+  - **Conventions settled during the backfill** (now also in `AGENTS.md` → Backend Conventions →
+    Testing):
+    - **Boundary-per-handler isolation, validation-once.** The cross-user `NotFound` boundary is
+      asserted on every id-taking handler (each calls `CurrentUserShoplists()` independently, so a
+      regression in one wouldn't be caught by testing another). The validation-short-circuit /
+      persists-nothing characterisation stays a single representative test in `CreateShoplistTests`;
+      per-rule shape validation is already covered by `Application.UnitTests` validators.
+    - **Handler-arrange by default**, reading state back through query handlers (`GetShoplist` /
+      `GetShoplists`). `ExecuteDbAsync` reserved for what handlers can't express/observe. Cross-user
+      arrange uses `CreateShoplist` with `asUser:` rather than DB seeding, where the handler can
+      express it.
+    - **Inline arrange asserts dropped.** Verified `ErrorOr<T>.Value` returns `default` (not a throw)
+      on an error state, so a broken arrange surfaces via the subsequent `.Value` use; tests assert
+      only their own responsibility, not the success of arrange steps.
+  - **Arrange helpers extracted** (same session, after test review): `CreateShoplistAsync` (plus an
+    `IEnumerable<string>` items overload) and `AddItemAsync` on `IntegrationTestBase` — handler-based
+    (dispatch the real `Create*` handler), assert success once, return the id. All tests refactored onto them
+    (~20× inline arrange removed). Principle held: only *preconditions* use helpers; the act under
+    test stays an explicit `SendAsync` (so `CreateShoplistItemTests` keeps `CreateShoplistItem`
+    inline as its SUT). Kept inline on the base for now (one aggregate); split into partials if/when
+    more aggregates bring their own helpers. Convention captured in `AGENTS.md` + ADR 018.
+
+- **2026-05-31** — Integration test user-acting surface simplified to a per-send override.
+  - Replaced the mutable `SetUserId(...)` / `private set` `CurrentUserId` pair with a read-only
+    ambient-default `CurrentUserId` (still a fresh id per test instance) plus an optional
+    `asUser` parameter on every `SendAsync` overload (`asUser ?? CurrentUserId` inside the
+    dispatch helper). Single-user tests stay zero-ceremony (never mention a user); cross-user
+    tests express the deviation locally and immutably at the call site instead of juggling an
+    ambient "current actor" across statements.
+  - Cross-user test renamed `Shoplist_IsNotVisibleToOtherUsers` — the old `...ByUserA...UserB`
+    name implied an A/B notion the code no longer carries; there's just the default user and
+    `asUser:` for another.
+  - `TestScopeContext` / `CreateScopeFor` channel unchanged — `asUser` flows into the existing
+    `userId` argument. [ADR 018](../../decisions/018-backend-integration-test-architecture.md)
+    updated in place (choice 3, composition shape, trade-offs, impl notes, spike).
+  - **Still parked** for a follow-up pass: the three `SendAsync` overloads + the
+    `ExecuteInScopeAsync` callback indirection, and dropping the dead `IRequest<T>` overload (no
+    handler uses it — all are `ICommand`/`IQuery`). Doc/ADR update for those lands with that pass.
+
+- **2026-05-15** — Handler integration test architecture decided and shipped.
+  - Architecture session worked through the three coupled choices (boundary, DB strategy,
+    `ICurrentUser` substitution) and resulting fixture shape. Outcome captured in
+    [ADR 018](../../decisions/018-backend-integration-test-architecture.md).
+  - **Boundary**: mediator-rooted (no HTTP). Tests dispatch Request records through `ISender`
+    against the real production DI graph (`AddApplication()` + `AddPersistence()`), so the full
+    pipeline (`ValidationBehavior`, logging, auto-registered validators) is exercised. HTTP
+    concerns are treated as transport.
+  - **DB strategy**: Testcontainers PostgreSQL, one container per assembly run. Migrations
+    applied once via the existing `DatabaseMigrationRunner` (same entry point the production
+    worker uses). **No per-test cleanup** — each test gets a fresh `UserId`, and the production
+    `OwnerId` filter (`dbContext.CurrentUserShoplists()`) provides isolation between tests as a
+    side effect of the existing authorization design. Full parallelism falls out.
+  - **Per-test state lives on the test base class as instance fields**, not on the session
+    fixture and not via `AsyncLocal`. TUnit instantiates the test class fresh for every `[Test]`
+    method, so initializers like `CurrentUserId = NewTestUserId()` run anew per test —
+    parallel-safe by construction without any reset hook. A scoped `TestScopeContext` carries the
+    current state into each operation's DI scope; `TestCurrentUser` and the `TimeProvider`
+    factory read it.
+  - **Composition root**: `Host.CreateApplicationBuilder()`. `AddPersistence` was extended with a
+    dual-mode entry point — `connectionName` (production hosts resolve from `IConfiguration`) or
+    raw `connectionString` (tests pass the Testcontainers connection string directly). Both paths
+    run Aspire's `EnrichNpgsqlDbContext`, so production and test EF Core configurations stay
+    aligned. Test fixture skips the previously-needed in-memory `IConfiguration` ceremony.
+  - **Postgres image pinning**: both `AppHost.cs` (`.WithImageTag("17.6")`) and the test fixture
+    (`new PostgreSqlBuilder("postgres:17.6")`) pin the engine version explicitly with
+    cross-reference comments, rather than relying on Aspire's bundled default. Same Postgres
+    major+minor on both sides; future bumps are a deliberate two-line change.
+  - **`SendAsync` folded**: three public overloads on `IntegrationTestBase` (`IRequest<T>`,
+    `ICommand<T>`, `IQuery<T>`) delegate to one private `ExecuteInScopeAsync` helper that creates
+    the scope, populates `TestScopeContext`, resolves `ISender`, and invokes a dispatch callback.
+    Three overloads are needed because Mediator's `IRequest<T>` / `ICommand<T>` / `IQuery<T>` are
+    sibling interfaces, not a hierarchy.
+  - **Scope model**: per-operation scope. Each `SendAsync` creates and disposes its own
+    `IServiceScope` — mirrors ASP.NET Core's per-request scoping and prevents tracked entities
+    from bleeding between arrange/act/assert.
+  - **`FakeTimeProvider`** wired from the start (registered as `TimeProvider`), so the fixture is
+    ready when time-dependent features land.
+  - **Spike scope** (initial PR): three tests on `CreateShoplist` — happy path, validation
+    failure, cross-user isolation. CI was already wired (`dotnet test --solution Shoplists.slnx`
+    in `pr-validation.yml`) — no workflow change required; the new project is picked up via the
+    slnx and GitHub-hosted runners ship with Docker for Testcontainers.
+  - **Deferred extension points** documented in ADR: `AddAsync<T>` / `FindAsync<T>` /
+    `CountAsync<T>` fixture helpers (add when a test needs them), HTTP-level smoke tests via
+    `WebApplicationFactory` (add only if endpoint logic grows beyond thin dispatchers), and
+    NSubstitute (a 10-line `TestCurrentUser` class is enough for now).
 
 - **2026-04-29** — Application-layer unit tests bootstrap.
   - `Application.UnitTests` project (added to slnx earlier) is now populated. 88 test cases across
@@ -283,7 +391,8 @@ bootstrap the test project first.
 
 ## Open questions
 
-- Testcontainers vs Aspire test host for handler integration tests.
-- How to handle `ICurrentUser` in tests — static substitution or a builder pattern.
 - Frontend tests at all? If yes, Vitest for composables, Playwright for critical user flows. Defer.
 - Coverage reporting — needed? If yes, Coverlet + ReportGenerator is the standard .NET path.
+
+Resolved (see [ADR 018](../../decisions/018-backend-integration-test-architecture.md)):
+Testcontainers vs Aspire test host; `ICurrentUser` substitution mechanism.

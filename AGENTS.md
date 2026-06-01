@@ -53,7 +53,7 @@ backend/
     3-hosts/
       Api/                   -> Minimal API host, endpoints, auth, OpenAPI
       DatabaseMigrator/      -> Worker service that applies migrations, then exits
-  tests/                     -> (empty; see docs/projects/testing/plan.md)
+  tests/                     -> TUnit projects + Testing.Common (see docs/projects/testing/plan.md)
 frontend/
   ...                        -> Nuxt application
 ```
@@ -66,7 +66,7 @@ AppHost orchestrates hosts but is not part of the layered architecture.
 
 **Layer constraints** (see ADR 012 for full responsibilities):
 - `Infrastructure` does NOT contain EF Core / database concerns — those live in `Persistence`
-- `AppDbContext` is `internal` — external code uses `IAppDbContext` (defined in Application) or `DatabaseMigrationRunner`
+- `AppDbContext` is `internal` — external code uses `IAppDbContext` (defined in Application) or `DatabaseMigrationRunner`. Sole exception: `Application.IntegrationTests` gets `InternalsVisibleTo` access to resolve the concrete context for direct DbSet arrange/assert (see Testing below).
 - `Application` defines interfaces (`IAppDbContext`, `ICurrentUser`); other layers implement them
 
 ---
@@ -236,6 +236,33 @@ Non-Aspire packages (EF Core, Mediator, etc.) are upgraded separately. See ADR
 - **No `ConfigureAwait(false)`** — no-op on ASP.NET Core / generic host (MA0004 suppressed in `.editorconfig`)
 - **Logging in handlers**: Log state and decisions (entity IDs, branches taken), not action descriptions. Pipeline behaviors handle cross-cutting logging.
 
+### Testing
+
+TUnit projects under `backend/tests/`, run via MTP-native `dotnet test --solution Shoplists.slnx`.
+Full conventions: `docs/projects/testing/plan.md`; architecture: ADR 014 (framework) + ADR 018
+(integration tests).
+
+- **Unit** — `Domain.UnitTests` (entity invariants), `Application.UnitTests` (validators / validation
+  helpers); no DB.
+- **Handler integration** — `Application.IntegrationTests`, rooted at the mediator boundary
+  (`SendAsync` of Request records) against a real Testcontainers PostgreSQL. One file per use case,
+  mirroring `Features/…`.
+  - **Isolation is automatic** — each test instance gets a fresh `UserId` and the `OwnerId` filter
+    scopes its data, so there's no per-test cleanup. Pass `asUser:` to `SendAsync` to act as another
+    user; assert that boundary returns `NotFound` on every id-taking handler.
+  - **Arrange through handlers; read state back through query handlers** (`GetShoplist` /
+    `GetShoplists`). Use the arrange helpers on the base — `CreateShoplistAsync` (with an items
+    overload, `CreateShoplistAsync(name, [..])`) and `AddItemAsync` — they dispatch through the real
+    handler, assert success once, and return the id. Only *preconditions* go through helpers; the act under test stays an explicit
+    `SendAsync`. Do NOT assert `ErrorOr` success on arrange steps yourself — assert only the SUT's
+    own responsibility (a broken arrange surfaces via the helper's assert, or via `.Value` being
+    `default`/`null`).
+  - **`ExecuteDbAsync`** (unfiltered, concrete `AppDbContext`) is the escape hatch for what handlers
+    can't express or observe — seeding arbitrary rows (out-of-order positions, other users' data; use
+    `Testing.Common` builders) or verifying raw state (e.g. cascade deletes). Prefer the handler path;
+    reach for it only when necessary.
+- New backend handlers go **TDD-first** — red/green/refactor against the mediator request.
+
 ---
 
 ## Frontend Conventions
@@ -383,6 +410,7 @@ dotnet build              # compile + analyzers (TreatWarningsAsErrors)
 dotnet csharpier check .  # CSharpier formatting
 dotnet format style --verify-no-changes
 dotnet format analyzers --verify-no-changes
+dotnet test --solution Shoplists.slnx   # TUnit suite (integration tests need Docker for Testcontainers)
 ```
 
 All must pass before any task is complete. Do NOT call `npx nuxi`/`npx nuxt` directly.

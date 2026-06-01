@@ -19,7 +19,7 @@ builder.AddServiceDefaults();
 // Register AppDbContext with the Aspire-provided connection string.
 // This is the same AddPersistence call the API host uses — the connection name must match
 // the database resource name defined in the AppHost.
-builder.AddPersistence(Resources.AppDb);
+builder.AddPersistence(connectionName: Resources.AppDb);
 
 // AppDbContext requires ICurrentUser for authorization-scoped queries. The migrator never
 // executes application queries — it only runs MigrateAsync() — but the DI container still

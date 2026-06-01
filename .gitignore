@@ -926,3 +926,6 @@ FodyWeavers.xsd
 
 # Playwright MCP
 .playwright-mcp/
+
+# C# Dev Kit (VS Code) language-service cache
+*.lscache
