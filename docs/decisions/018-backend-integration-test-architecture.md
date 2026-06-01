@@ -74,15 +74,17 @@ Three coupled choices:
 Two classes split the concerns cleanly:
 
 - **`ApplicationFixture`** (session-scoped via TUnit `[ClassDataSource<…>(Shared =
-  SharedType.PerTestSession)]`) owns the Postgres container, the host, and the DI graph. It
-  exposes one method for tests to use the system: `CreateScopeFor(UserId, FakeTimeProvider)`,
-  which produces a DI scope primed so that `ICurrentUser` and `TimeProvider` resolve to the
-  passed values inside that scope.
+  SharedType.PerTestSession)]`) owns the Postgres container, the host, and the DI graph. The class
+  is `public` (TUnit injects it), but its one consumer-facing method, `internal CreateScopeFor(UserId,
+  FakeTimeProvider)`, is locked down to the test assembly. It produces a DI scope primed so that
+  `ICurrentUser` and `TimeProvider` resolve to the passed values inside that scope.
 - **`IntegrationTestBase`** (per-test, abstract) holds the ambient-default `CurrentUserId`
-  (read-only) and `FakeTimeProvider` as instance fields, exposes `SetUtcNow` / `CurrentUserId` /
-  `TimeProvider` helpers, and provides `SendAsync` overloads with an optional `asUser` parameter.
-  It does not know about the scope-priming mechanism — it just calls
-  `Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider)`.
+  (read-only) and `FakeTimeProvider` as `protected` instance members, and provides `protected`
+  `SendAsync` overloads with an optional `asUser` parameter. Time-dependent tests mutate the clock
+  via the exposed `TimeProvider` (`FakeTimeProvider.SetUtcNow(...)`) directly — no wrapper helper.
+  Everything except the TUnit-injected `Fixture` is `protected`/`private`, so the only surface
+  visible outside an inheriting test is the `[Test]` methods. The base does not know about the
+  scope-priming mechanism — it just calls `Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider)`.
 - **`TestScopeContext`** is an internal scoped DI service inside the fixture that carries the
   per-test state into each scope. Only the fixture's `CreateScopeFor` method writes to it; the
   test base never imports the type.
@@ -107,7 +109,7 @@ await DatabaseMigrationRunner.RunMigrationsAsync(host.Services, CancellationToke
 _scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();
 
 // Fixture — primed-scope creation:
-public IServiceScope CreateScopeFor(UserId userId, FakeTimeProvider timeProvider)
+internal IServiceScope CreateScopeFor(UserId userId, FakeTimeProvider timeProvider)
 {
     var scope = _scopeFactory.CreateScope();
     var context = scope.ServiceProvider.GetRequiredService<TestScopeContext>();

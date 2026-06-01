@@ -36,6 +36,8 @@ public sealed class ApplicationFixture : IAsyncInitializer, IAsyncDisposable
         builder.Services.AddScoped<ICurrentUser, TestCurrentUser>();
         builder.Services.AddScoped<TimeProvider>(sp =>
             sp.GetRequiredService<TestScopeContext>().TimeProvider
+            // should be sent through IntegrationTestBase.SendAsync
+            ?? throw new InvalidOperationException("No time provider set on the test scope.")
         );
 
         var host = builder.Build();
@@ -43,12 +45,12 @@ public sealed class ApplicationFixture : IAsyncInitializer, IAsyncDisposable
         _scopeFactory = host.Services.GetRequiredService<IServiceScopeFactory>();
     }
 
-    public IServiceScope CreateScopeFor(UserId userId, FakeTimeProvider timeProvider)
+    internal IServiceScope CreateScopeFor(UserId userId, FakeTimeProvider timeProvider)
     {
         var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<TestScopeContext>();
-        context.UserId = userId;
-        context.TimeProvider = timeProvider;
+        scope
+            .ServiceProvider.GetRequiredService<TestScopeContext>()
+            .Initialize(userId, timeProvider);
         return scope;
     }
 
