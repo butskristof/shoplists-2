@@ -225,9 +225,13 @@ bootstrap the test project first.
     - **Inline arrange asserts dropped.** Verified `ErrorOr<T>.Value` returns `default` (not a throw)
       on an error state, so a broken arrange surfaces via the subsequent `.Value` use; tests assert
       only their own responsibility, not the success of arrange steps.
-  - **Parked for the next checkpoint**: the "create list (+ item)" arrange now repeats ~20× inline.
-    Agreed to extract a small arrange helper on the base (assert success once, return the id) — design
-    discussion deferred until the tests themselves are reviewed.
+  - **Arrange helpers extracted** (same session, after test review): `CreateShoplistAsync`,
+    `AddItemAsync`, `CreateShoplistWithItemsAsync` on `IntegrationTestBase` — handler-based (dispatch
+    the real `Create*` handler), assert success once, return the id. All tests refactored onto them
+    (~20× inline arrange removed). Principle held: only *preconditions* use helpers; the act under
+    test stays an explicit `SendAsync` (so `CreateShoplistItemTests` keeps `CreateShoplistItem`
+    inline as its SUT). Kept inline on the base for now (one aggregate); split into partials if/when
+    more aggregates bring their own helpers. Convention captured in `AGENTS.md` + ADR 018.
 
 - **2026-05-31** — Integration test user-acting surface simplified to a per-send override.
   - Replaced the mutable `SetUserId(...)` / `private set` `CurrentUserId` pair with a read-only

@@ -13,13 +13,10 @@ public sealed class DeleteShoplistItemTests : IntegrationTestBase
     [Test]
     public async Task ValidRequest_DeletesItem()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        var itemResult = await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        var itemId = await AddItemAsync(shoplistId, "Milk");
 
-        var result = await SendAsync(
-            new DeleteShoplistItem.Request(shoplistId, itemResult.Value.Id)
-        );
+        var result = await SendAsync(new DeleteShoplistItem.Request(shoplistId, itemId));
 
         await Assert.That(result.IsError).IsFalse();
         var getResult = await SendAsync(new GetShoplist.Request(shoplistId));
@@ -29,13 +26,12 @@ public sealed class DeleteShoplistItemTests : IntegrationTestBase
     [Test]
     public async Task DeletingMiddleItem_CompactsFollowingPositions()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "A"));
-        var b = await SendAsync(new CreateShoplistItem.Request(shoplistId, "B"));
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "C"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        await AddItemAsync(shoplistId, "A");
+        var itemBId = await AddItemAsync(shoplistId, "B");
+        await AddItemAsync(shoplistId, "C");
 
-        var result = await SendAsync(new DeleteShoplistItem.Request(shoplistId, b.Value.Id));
+        var result = await SendAsync(new DeleteShoplistItem.Request(shoplistId, itemBId));
 
         await Assert.That(result.IsError).IsFalse();
         var items = (await SendAsync(new GetShoplist.Request(shoplistId))).Value.Items;
@@ -60,10 +56,10 @@ public sealed class DeleteShoplistItemTests : IntegrationTestBase
     [Test]
     public async Task UnknownItem_ReturnsNotFound()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
         var result = await SendAsync(
-            new DeleteShoplistItem.Request(createResult.Value.Id, ShoplistItemId.New())
+            new DeleteShoplistItem.Request(shoplistId, ShoplistItemId.New())
         );
 
         await Assert.That(result.IsError).IsTrue();
@@ -74,18 +70,10 @@ public sealed class DeleteShoplistItemTests : IntegrationTestBase
     public async Task OtherUsersShoplist_ReturnsNotFound()
     {
         var otherUser = UserId.New();
-        var createResult = await SendAsync(
-            new CreateShoplist.Request("Their list"),
-            asUser: otherUser
-        );
-        var itemResult = await SendAsync(
-            new CreateShoplistItem.Request(createResult.Value.Id, "Milk"),
-            asUser: otherUser
-        );
+        var shoplistId = await CreateShoplistAsync("Their list", asUser: otherUser);
+        var itemId = await AddItemAsync(shoplistId, "Milk", asUser: otherUser);
 
-        var result = await SendAsync(
-            new DeleteShoplistItem.Request(createResult.Value.Id, itemResult.Value.Id)
-        );
+        var result = await SendAsync(new DeleteShoplistItem.Request(shoplistId, itemId));
 
         await Assert.That(result.IsError).IsTrue();
         await Assert.That(result.FirstError.Type).IsEqualTo(ErrorType.NotFound);

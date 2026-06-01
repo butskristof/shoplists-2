@@ -12,8 +12,7 @@ public sealed class UpdateShoplistTests : IntegrationTestBase
     [Test]
     public async Task ValidRequest_UpdatesName()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
         var result = await SendAsync(new UpdateShoplist.Request(shoplistId, "Weekly groceries"));
 
@@ -35,11 +34,7 @@ public sealed class UpdateShoplistTests : IntegrationTestBase
     public async Task OtherUsersShoplist_ReturnsNotFound_AndLeavesItUnchanged()
     {
         var otherUser = UserId.New();
-        var createResult = await SendAsync(
-            new CreateShoplist.Request("Their list"),
-            asUser: otherUser
-        );
-        var shoplistId = createResult.Value.Id;
+        var shoplistId = await CreateShoplistAsync("Their list", asUser: otherUser);
 
         var result = await SendAsync(new UpdateShoplist.Request(shoplistId, "Hacked"));
 

@@ -13,14 +13,13 @@ public sealed class UpdateShoplistItemPositionTests : IntegrationTestBase
     [Test]
     public async Task MovingItemDown_PersistsReorderedPositions()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        var a = await SendAsync(new CreateShoplistItem.Request(shoplistId, "A"));
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "B"));
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "C"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        var itemAId = await AddItemAsync(shoplistId, "A");
+        await AddItemAsync(shoplistId, "B");
+        await AddItemAsync(shoplistId, "C");
 
         var result = await SendAsync(
-            new UpdateShoplistItemPosition.Request(shoplistId, a.Value.Id, 3)
+            new UpdateShoplistItemPosition.Request(shoplistId, itemAId, 3)
         );
 
         await Assert.That(result.IsError).IsFalse();
@@ -36,14 +35,11 @@ public sealed class UpdateShoplistItemPositionTests : IntegrationTestBase
     [Test]
     public async Task MovingItemUp_PersistsReorderedPositions()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "A"));
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "B"));
-        var c = await SendAsync(new CreateShoplistItem.Request(shoplistId, "C"));
+        var shoplistId = await CreateShoplistAsync("Groceries", ["A", "B"]);
+        var itemCId = await AddItemAsync(shoplistId, "C");
 
         var result = await SendAsync(
-            new UpdateShoplistItemPosition.Request(shoplistId, c.Value.Id, 1)
+            new UpdateShoplistItemPosition.Request(shoplistId, itemCId, 1)
         );
 
         await Assert.That(result.IsError).IsFalse();
@@ -61,13 +57,12 @@ public sealed class UpdateShoplistItemPositionTests : IntegrationTestBase
     {
         // Position >= 1 clears the validator, so this exercises the handler's own out-of-range
         // guard (MoveItem returning false) rather than the FluentValidation rule.
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        var a = await SendAsync(new CreateShoplistItem.Request(shoplistId, "A"));
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "B"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        var itemAId = await AddItemAsync(shoplistId, "A");
+        await AddItemAsync(shoplistId, "B");
 
         var result = await SendAsync(
-            new UpdateShoplistItemPosition.Request(shoplistId, a.Value.Id, 5)
+            new UpdateShoplistItemPosition.Request(shoplistId, itemAId, 5)
         );
 
         await Assert.That(result.IsError).IsTrue();
@@ -92,14 +87,10 @@ public sealed class UpdateShoplistItemPositionTests : IntegrationTestBase
     [Test]
     public async Task UnknownItem_ReturnsNotFound()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
         var result = await SendAsync(
-            new UpdateShoplistItemPosition.Request(
-                createResult.Value.Id,
-                ShoplistItemId.New(),
-                Position: 1
-            )
+            new UpdateShoplistItemPosition.Request(shoplistId, ShoplistItemId.New(), Position: 1)
         );
 
         await Assert.That(result.IsError).IsTrue();
@@ -110,21 +101,11 @@ public sealed class UpdateShoplistItemPositionTests : IntegrationTestBase
     public async Task OtherUsersShoplist_ReturnsNotFound()
     {
         var otherUser = UserId.New();
-        var createResult = await SendAsync(
-            new CreateShoplist.Request("Their list"),
-            asUser: otherUser
-        );
-        var itemResult = await SendAsync(
-            new CreateShoplistItem.Request(createResult.Value.Id, "Milk"),
-            asUser: otherUser
-        );
+        var shoplistId = await CreateShoplistAsync("Their list", asUser: otherUser);
+        var itemId = await AddItemAsync(shoplistId, "Milk", asUser: otherUser);
 
         var result = await SendAsync(
-            new UpdateShoplistItemPosition.Request(
-                createResult.Value.Id,
-                itemResult.Value.Id,
-                Position: 1
-            )
+            new UpdateShoplistItemPosition.Request(shoplistId, itemId, Position: 1)
         );
 
         await Assert.That(result.IsError).IsTrue();

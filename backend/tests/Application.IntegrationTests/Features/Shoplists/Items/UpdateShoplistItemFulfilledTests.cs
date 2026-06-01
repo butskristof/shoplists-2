@@ -13,10 +13,8 @@ public sealed class UpdateShoplistItemFulfilledTests : IntegrationTestBase
     [Test]
     public async Task ValidRequest_MarksItemFulfilled()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        var itemResult = await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
-        var itemId = itemResult.Value.Id;
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        var itemId = await AddItemAsync(shoplistId, "Milk");
 
         var result = await SendAsync(
             new UpdateShoplistItemFulfilled.Request(shoplistId, itemId, IsFulfilled: true)
@@ -30,10 +28,8 @@ public sealed class UpdateShoplistItemFulfilledTests : IntegrationTestBase
     [Test]
     public async Task ValidRequest_MarksItemUnfulfilled()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        var itemResult = await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
-        var itemId = itemResult.Value.Id;
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        var itemId = await AddItemAsync(shoplistId, "Milk");
         await SendAsync(
             new UpdateShoplistItemFulfilled.Request(shoplistId, itemId, IsFulfilled: true)
         );
@@ -65,11 +61,11 @@ public sealed class UpdateShoplistItemFulfilledTests : IntegrationTestBase
     [Test]
     public async Task UnknownItem_ReturnsNotFound()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
         var result = await SendAsync(
             new UpdateShoplistItemFulfilled.Request(
-                createResult.Value.Id,
+                shoplistId,
                 ShoplistItemId.New(),
                 IsFulfilled: true
             )
@@ -83,21 +79,11 @@ public sealed class UpdateShoplistItemFulfilledTests : IntegrationTestBase
     public async Task OtherUsersShoplist_ReturnsNotFound()
     {
         var otherUser = UserId.New();
-        var createResult = await SendAsync(
-            new CreateShoplist.Request("Their list"),
-            asUser: otherUser
-        );
-        var itemResult = await SendAsync(
-            new CreateShoplistItem.Request(createResult.Value.Id, "Milk"),
-            asUser: otherUser
-        );
+        var shoplistId = await CreateShoplistAsync("Their list", asUser: otherUser);
+        var itemId = await AddItemAsync(shoplistId, "Milk", asUser: otherUser);
 
         var result = await SendAsync(
-            new UpdateShoplistItemFulfilled.Request(
-                createResult.Value.Id,
-                itemResult.Value.Id,
-                IsFulfilled: true
-            )
+            new UpdateShoplistItemFulfilled.Request(shoplistId, itemId, IsFulfilled: true)
         );
 
         await Assert.That(result.IsError).IsTrue();

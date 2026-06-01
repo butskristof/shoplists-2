@@ -1,7 +1,6 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Shoplists.Application.Features.Shoplists;
-using Shoplists.Application.Features.Shoplists.Items;
 using Shoplists.Application.IntegrationTests.Common;
 using Shoplists.Domain.Models.Shoplists;
 using Shoplists.Domain.Models.Users;
@@ -14,9 +13,9 @@ public sealed class DeleteShoplistTests : IntegrationTestBase
     [Test]
     public async Task ValidRequest_DeletesShoplist()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
-        var result = await SendAsync(new DeleteShoplist.Request(createResult.Value.Id));
+        var result = await SendAsync(new DeleteShoplist.Request(shoplistId));
 
         await Assert.That(result.IsError).IsFalse();
         var listResult = await SendAsync(new GetShoplists.Request());
@@ -26,10 +25,7 @@ public sealed class DeleteShoplistTests : IntegrationTestBase
     [Test]
     public async Task ShoplistWithItems_CascadeDeletesItems()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "Bread"));
+        var shoplistId = await CreateShoplistWithItemsAsync("Groceries", ["Milk", "Bread"]);
 
         var result = await SendAsync(new DeleteShoplist.Request(shoplistId));
 
@@ -55,12 +51,9 @@ public sealed class DeleteShoplistTests : IntegrationTestBase
     public async Task OtherUsersShoplist_ReturnsNotFound_AndLeavesItIntact()
     {
         var otherUser = UserId.New();
-        var createResult = await SendAsync(
-            new CreateShoplist.Request("Their list"),
-            asUser: otherUser
-        );
+        var shoplistId = await CreateShoplistAsync("Their list", asUser: otherUser);
 
-        var result = await SendAsync(new DeleteShoplist.Request(createResult.Value.Id));
+        var result = await SendAsync(new DeleteShoplist.Request(shoplistId));
 
         await Assert.That(result.IsError).IsTrue();
         await Assert.That(result.FirstError.Type).IsEqualTo(ErrorType.NotFound);

@@ -13,10 +13,8 @@ public sealed class UpdateShoplistItemTests : IntegrationTestBase
     [Test]
     public async Task ValidRequest_UpdatesName()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        var itemResult = await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
-        var itemId = itemResult.Value.Id;
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        var itemId = await AddItemAsync(shoplistId, "Milk");
 
         var result = await SendAsync(
             new UpdateShoplistItem.Request(shoplistId, itemId, "Almond milk")
@@ -41,10 +39,10 @@ public sealed class UpdateShoplistItemTests : IntegrationTestBase
     [Test]
     public async Task UnknownItem_ReturnsNotFound()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
         var result = await SendAsync(
-            new UpdateShoplistItem.Request(createResult.Value.Id, ShoplistItemId.New(), "Milk")
+            new UpdateShoplistItem.Request(shoplistId, ShoplistItemId.New(), "Milk")
         );
 
         await Assert.That(result.IsError).IsTrue();
@@ -55,18 +53,10 @@ public sealed class UpdateShoplistItemTests : IntegrationTestBase
     public async Task OtherUsersShoplist_ReturnsNotFound()
     {
         var otherUser = UserId.New();
-        var createResult = await SendAsync(
-            new CreateShoplist.Request("Their list"),
-            asUser: otherUser
-        );
-        var itemResult = await SendAsync(
-            new CreateShoplistItem.Request(createResult.Value.Id, "Milk"),
-            asUser: otherUser
-        );
+        var shoplistId = await CreateShoplistAsync("Their list", asUser: otherUser);
+        var itemId = await AddItemAsync(shoplistId, "Milk", asUser: otherUser);
 
-        var result = await SendAsync(
-            new UpdateShoplistItem.Request(createResult.Value.Id, itemResult.Value.Id, "Hacked")
-        );
+        var result = await SendAsync(new UpdateShoplistItem.Request(shoplistId, itemId, "Hacked"));
 
         await Assert.That(result.IsError).IsTrue();
         await Assert.That(result.FirstError.Type).IsEqualTo(ErrorType.NotFound);

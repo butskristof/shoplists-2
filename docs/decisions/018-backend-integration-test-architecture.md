@@ -187,6 +187,14 @@ reserved for what handlers genuinely can't express or observe. Cross-user *arran
 `CreateShoplist` with `asUser:` rather than DB seeding wherever the handler can express it — the seed
 is only for state outside the handler vocabulary (e.g. a specific position layout).
 
+Handler-arrange is wrapped in thin helpers on `IntegrationTestBase` (`CreateShoplistAsync`,
+`AddItemAsync`, `CreateShoplistWithItemsAsync`) — each dispatches the real `Create*` handler, asserts
+success once (so a broken precondition fails with a clear message, not a downstream NRE), and returns
+the new id. Only *preconditions* go through helpers; the operation under test stays an explicit
+`SendAsync`. Helpers are added per aggregate as duplication appears (kept inline on the base while
+there is one aggregate; split into partials if/when more arrive). A single generic `ExecuteDbAsync`
+covers the raw-DB side rather than typed `AddAsync`/`FindAsync`/`CountAsync` helpers.
+
 A single generic primitive was chosen over the speculated typed `AddAsync` / `FindAsync` /
 `CountAsync` helpers: one seam, and a lambda expresses any EF Core operation (`Add`, `Set<T>()`,
 `CountAsync`, `AnyAsync`, …). Revisit a typed convenience layer only if call sites show enough

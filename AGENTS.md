@@ -251,8 +251,12 @@ Full conventions: `docs/projects/testing/plan.md`; architecture: ADR 014 (framew
     scopes its data, so there's no per-test cleanup. Pass `asUser:` to `SendAsync` to act as another
     user; assert that boundary returns `NotFound` on every id-taking handler.
   - **Arrange through handlers; read state back through query handlers** (`GetShoplist` /
-    `GetShoplists`). Do NOT assert `ErrorOr` success on arrange steps — assert only the SUT's own
-    responsibility (a broken arrange surfaces via `.Value` being `default`/`null`).
+    `GetShoplists`). Use the arrange helpers on the base (`CreateShoplistAsync`, `AddItemAsync`,
+    `CreateShoplistWithItemsAsync`) — they dispatch through the real handler, assert success once,
+    and return the id. Only *preconditions* go through helpers; the act under test stays an explicit
+    `SendAsync`. Do NOT assert `ErrorOr` success on arrange steps yourself — assert only the SUT's
+    own responsibility (a broken arrange surfaces via the helper's assert, or via `.Value` being
+    `default`/`null`).
   - **`ExecuteDbAsync`** (unfiltered, concrete `AppDbContext`) is the escape hatch for what handlers
     can't express or observe — seeding arbitrary rows (out-of-order positions, other users' data; use
     `Testing.Common` builders) or verifying raw state (e.g. cascade deletes). Prefer the handler path;

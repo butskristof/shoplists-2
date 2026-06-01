@@ -45,9 +45,9 @@ public sealed class GetShoplistTests : IntegrationTestBase
     [Test]
     public async Task ShoplistWithoutItems_ReturnsEmptyItemsCollection()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
-        var result = await SendAsync(new GetShoplist.Request(createResult.Value.Id));
+        var result = await SendAsync(new GetShoplist.Request(shoplistId));
 
         await Assert.That(result.IsError).IsFalse();
         await Assert.That(result.Value.Items).IsEmpty();
@@ -66,12 +66,9 @@ public sealed class GetShoplistTests : IntegrationTestBase
     public async Task OtherUsersShoplist_ReturnsNotFound()
     {
         var otherUser = UserId.New();
-        var createResult = await SendAsync(
-            new CreateShoplist.Request("Their list"),
-            asUser: otherUser
-        );
+        var shoplistId = await CreateShoplistAsync("Their list", asUser: otherUser);
 
-        var result = await SendAsync(new GetShoplist.Request(createResult.Value.Id));
+        var result = await SendAsync(new GetShoplist.Request(shoplistId));
 
         await Assert.That(result.IsError).IsTrue();
         await Assert.That(result.FirstError.Type).IsEqualTo(ErrorType.NotFound);

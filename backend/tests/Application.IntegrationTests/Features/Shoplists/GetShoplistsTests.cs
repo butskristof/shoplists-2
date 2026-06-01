@@ -20,9 +20,8 @@ public sealed class GetShoplistsTests : IntegrationTestBase
     [Test]
     public async Task ReturnsOnlyCurrentUsersShoplists()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        await SendAsync(new CreateShoplist.Request("Theirs"), asUser: UserId.New());
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        await CreateShoplistAsync("Theirs", asUser: UserId.New());
 
         var result = await SendAsync(new GetShoplists.Request());
 
@@ -34,13 +33,12 @@ public sealed class GetShoplistsTests : IntegrationTestBase
     [Test]
     public async Task ReturnsItemCounts_TotalAndFulfilled()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
-        var milk = await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "Bread"));
-        await SendAsync(new CreateShoplistItem.Request(shoplistId, "Eggs"));
+        var shoplistId = await CreateShoplistAsync("Groceries");
+        var milkId = await AddItemAsync(shoplistId, "Milk");
+        await AddItemAsync(shoplistId, "Bread");
+        await AddItemAsync(shoplistId, "Eggs");
         await SendAsync(
-            new UpdateShoplistItemFulfilled.Request(shoplistId, milk.Value.Id, IsFulfilled: true)
+            new UpdateShoplistItemFulfilled.Request(shoplistId, milkId, IsFulfilled: true)
         );
 
         var result = await SendAsync(new GetShoplists.Request());
@@ -54,7 +52,7 @@ public sealed class GetShoplistsTests : IntegrationTestBase
     [Test]
     public async Task ShoplistWithoutItems_HasZeroItemCounts()
     {
-        await SendAsync(new CreateShoplist.Request("Empty"));
+        await CreateShoplistAsync("Empty");
 
         var result = await SendAsync(new GetShoplists.Request());
 

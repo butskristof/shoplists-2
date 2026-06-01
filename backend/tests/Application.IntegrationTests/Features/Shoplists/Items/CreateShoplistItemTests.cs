@@ -13,8 +13,7 @@ public sealed class CreateShoplistItemTests : IntegrationTestBase
     [Test]
     public async Task ValidRequest_CreatesItem()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
         var result = await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
 
@@ -31,8 +30,7 @@ public sealed class CreateShoplistItemTests : IntegrationTestBase
     [Test]
     public async Task AssignsSequentialPositions()
     {
-        var createResult = await SendAsync(new CreateShoplist.Request("Groceries"));
-        var shoplistId = createResult.Value.Id;
+        var shoplistId = await CreateShoplistAsync("Groceries");
 
         await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
         await SendAsync(new CreateShoplistItem.Request(shoplistId, "Bread"));
@@ -61,12 +59,9 @@ public sealed class CreateShoplistItemTests : IntegrationTestBase
     public async Task OtherUsersShoplist_ReturnsNotFound()
     {
         var otherUser = UserId.New();
-        var createResult = await SendAsync(
-            new CreateShoplist.Request("Their list"),
-            asUser: otherUser
-        );
+        var shoplistId = await CreateShoplistAsync("Their list", asUser: otherUser);
 
-        var result = await SendAsync(new CreateShoplistItem.Request(createResult.Value.Id, "Milk"));
+        var result = await SendAsync(new CreateShoplistItem.Request(shoplistId, "Milk"));
 
         await Assert.That(result.IsError).IsTrue();
         await Assert.That(result.FirstError.Type).IsEqualTo(ErrorType.NotFound);

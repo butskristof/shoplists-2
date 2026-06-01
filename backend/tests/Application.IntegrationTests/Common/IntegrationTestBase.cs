@@ -1,6 +1,9 @@
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
+using Shoplists.Application.Features.Shoplists;
+using Shoplists.Application.Features.Shoplists.Items;
+using Shoplists.Domain.Models.Shoplists;
 using Shoplists.Domain.Models.Users;
 using Shoplists.Persistence;
 using Shoplists.Testing.Common.TestData;
@@ -41,6 +44,45 @@ public abstract class IntegrationTestBase
         using var scope = Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider);
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         return await dispatch(sender);
+    }
+
+    #endregion
+
+    #region Arrange
+
+    // Handler-based arrange: build preconditions through the real mediator path (no second
+    // construction route to drift from production) and assert success once, centrally, so test
+    // bodies stay focused on the behaviour under test. For state the handler vocabulary can't
+    // express (out-of-order positions, raw rows), use the Direct database access escape hatch below.
+
+    protected async ValueTask<ShoplistId> CreateShoplistAsync(string name, UserId? asUser = null)
+    {
+        var result = await SendAsync(new CreateShoplist.Request(name), asUser);
+        await Assert.That(result.IsError).IsFalse();
+        return result.Value.Id;
+    }
+
+    protected async ValueTask<ShoplistItemId> AddItemAsync(
+        ShoplistId shoplistId,
+        string name,
+        UserId? asUser = null
+    )
+    {
+        var result = await SendAsync(new CreateShoplistItem.Request(shoplistId, name), asUser);
+        await Assert.That(result.IsError).IsFalse();
+        return result.Value.Id;
+    }
+
+    protected async ValueTask<ShoplistId> CreateShoplistWithItemsAsync(
+        string name,
+        IEnumerable<string> itemNames,
+        UserId? asUser = null
+    )
+    {
+        var shoplistId = await CreateShoplistAsync(name, asUser);
+        foreach (var itemName in itemNames)
+            await AddItemAsync(shoplistId, itemName, asUser);
+        return shoplistId;
     }
 
     #endregion
