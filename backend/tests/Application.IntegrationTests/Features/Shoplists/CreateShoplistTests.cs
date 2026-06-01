@@ -42,15 +42,13 @@ public sealed class CreateShoplistTests : IntegrationTestBase
     [Test]
     public async Task Shoplist_IsNotVisibleToOtherUsers()
     {
-        var otherUser = UserId.New();
-
-        var createResult = await SendAsync(new CreateShoplist.Request("My list"));
-        await Assert.That(createResult.IsError).IsFalse();
+        await SendAsync(new CreateShoplist.Request("My list"));
 
         var ownerResult = await SendAsync(new GetShoplists.Request());
         await Assert.That(ownerResult.IsError).IsFalse();
         await Assert.That(ownerResult.Value.Count).IsEqualTo(1);
 
+        var otherUser = UserId.New();
         var otherResult = await SendAsync(new GetShoplists.Request(), asUser: otherUser);
         await Assert.That(otherResult.IsError).IsFalse();
         await Assert.That(otherResult.Value.Count).IsEqualTo(0);

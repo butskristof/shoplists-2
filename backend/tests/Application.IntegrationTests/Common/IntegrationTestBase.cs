@@ -2,6 +2,7 @@ using Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using Shoplists.Domain.Models.Users;
+using Shoplists.Persistence;
 using Shoplists.Testing.Common.TestData;
 
 namespace Shoplists.Application.IntegrationTests.Common;
@@ -40,6 +41,37 @@ public abstract class IntegrationTestBase
         using var scope = Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider);
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         return await dispatch(sender);
+    }
+
+    #endregion
+
+    #region Direct database access
+
+    // Escape hatch for arrange/assert that the mediator surface cannot express: seeding arbitrary
+    // state (other users' data, specific positions) and verifying raw rows (e.g. proving cascade
+    // deletes physically removed ShoplistItems, which no handler can observe). Each call gets a
+    // fresh scope + DbContext, so reads reflect committed state with no change-tracker bleed.
+    // Access is UNFILTERED: context.Set<T>() / context.Shoplists bypass the OwnerId filter that
+    // lives only in CurrentUserShoplists(); the asUser priming just satisfies the DbContext ctor.
+
+    private protected async ValueTask ExecuteDbAsync(
+        Func<AppDbContext, ValueTask> action,
+        UserId? asUser = null
+    )
+    {
+        using var scope = Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider);
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await action(dbContext);
+    }
+
+    private protected async ValueTask<TResult> ExecuteDbAsync<TResult>(
+        Func<AppDbContext, ValueTask<TResult>> action,
+        UserId? asUser = null
+    )
+    {
+        using var scope = Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider);
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        return await action(dbContext);
     }
 
     #endregion
