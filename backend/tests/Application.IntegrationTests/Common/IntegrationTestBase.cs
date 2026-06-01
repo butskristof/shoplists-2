@@ -73,7 +73,7 @@ public abstract class IntegrationTestBase
         return result.Value.Id;
     }
 
-    protected async ValueTask<ShoplistId> CreateShoplistWithItemsAsync(
+    protected async ValueTask<ShoplistId> CreateShoplistAsync(
         string name,
         IEnumerable<string> itemNames,
         UserId? asUser = null

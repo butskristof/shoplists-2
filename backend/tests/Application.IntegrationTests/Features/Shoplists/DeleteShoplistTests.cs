@@ -25,7 +25,7 @@ public sealed class DeleteShoplistTests : IntegrationTestBase
     [Test]
     public async Task ShoplistWithItems_CascadeDeletesItems()
     {
-        var shoplistId = await CreateShoplistWithItemsAsync("Groceries", ["Milk", "Bread"]);
+        var shoplistId = await CreateShoplistAsync("Groceries", ["Milk", "Bread"]);
 
         var result = await SendAsync(new DeleteShoplist.Request(shoplistId));
 

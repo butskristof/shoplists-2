@@ -187,8 +187,8 @@ reserved for what handlers genuinely can't express or observe. Cross-user *arran
 `CreateShoplist` with `asUser:` rather than DB seeding wherever the handler can express it — the seed
 is only for state outside the handler vocabulary (e.g. a specific position layout).
 
-Handler-arrange is wrapped in thin helpers on `IntegrationTestBase` (`CreateShoplistAsync`,
-`AddItemAsync`, `CreateShoplistWithItemsAsync`) — each dispatches the real `Create*` handler, asserts
+Handler-arrange is wrapped in thin helpers on `IntegrationTestBase` (`CreateShoplistAsync`, with an
+`IEnumerable<string>` items overload, and `AddItemAsync`) — each dispatches the real `Create*` handler, asserts
 success once (so a broken precondition fails with a clear message, not a downstream NRE), and returns
 the new id. Only *preconditions* go through helpers; the operation under test stays an explicit
 `SendAsync`. Helpers are added per aggregate as duplication appears (kept inline on the base while
