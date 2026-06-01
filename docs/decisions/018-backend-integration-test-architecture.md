@@ -32,7 +32,8 @@ Constraints driving the choice:
   registration drift goes undetected.
 - **Clean architecture layers** ([ADR 012](012-clean-architecture-layers.md)) — `AppDbContext` is
   internal to Persistence; external code goes through `IAppDbContext` or `DatabaseMigrationRunner`.
-  Tests must respect these boundaries.
+  Tests must respect these boundaries — with one sanctioned, test-only exception for direct DB
+  arrange/assert (see *Direct database access* under Decision).
 - **`OwnerId`-scoped authorization** ([ADR 007](007-resource-authorization.md)) — every read goes
   through `dbContext.CurrentUserShoplists()`, which filters by the current user's `OwnerId`. This
   invariant is load-bearing for the test isolation model below.
@@ -135,6 +136,61 @@ this is necessary because `IRequest<T>`, `ICommand<T>`, and `IQuery<T>` are sibl
 Mediator (all extending `IBaseRequest`), not parent/child, so a single overload via covariance
 isn't possible. The per-operation scope mirrors ASP.NET Core's per-request scoping and prevents
 tests from accidentally relying on tracked entities bleeding between arrange/act/assert.
+
+### Direct database access (arrange/assert escape hatch)
+
+Most tests arrange through handlers and read state back through query handlers. Two needs fall
+outside what the mediator surface can express:
+
+- **Arrange** that no handler can produce in one step — seeding items with out-of-order positions,
+  or another user's data.
+- **Assert** on state no handler can observe — most pointedly the cascade-delete proof: once a
+  shoplist is deleted, no query can reach its items, so only a direct read of the items table
+  distinguishes "cascade removed them" from "left them orphaned".
+
+`IAppDbContext` is insufficient for the assert case — it exposes only `Shoplists` and
+`CurrentUserShoplists()`; child entities are reached through the aggregate by design, so there is no
+`Set<ShoplistItem>()`. The concrete `AppDbContext` has it, but is `internal` to Persistence.
+
+Mechanism:
+
+- **`InternalsVisibleTo("Shoplists.Application.IntegrationTests")`** on `Persistence.csproj` — the
+  sole sanctioned exception to the "external code uses `IAppDbContext`" layer rule (it grants *test*
+  code the concrete type without widening the production surface). `AppDbContext` is already
+  DI-registered as the concrete type (`AddDbContext<AppDbContext>()`, with `IAppDbContext` forwarding
+  to the same scoped instance), so a test scope resolves it directly.
+- **`ExecuteDbAsync` on `IntegrationTestBase`** — void and `<TResult>` overloads:
+
+```csharp
+private protected async ValueTask ExecuteDbAsync(
+    Func<AppDbContext, ValueTask> action, UserId? asUser = null)
+{
+    using var scope = Fixture.CreateScopeFor(asUser ?? CurrentUserId, TimeProvider);
+    await action(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+}
+// + a ValueTask<TResult> overload for queries
+```
+
+  Properties that matter:
+  - **Fresh scope per call**, exactly like `SendAsync` — a read after a dispatched operation sees
+    committed state, with no change-tracker bleed between arrange/act/assert.
+  - **`private protected`**, because it surfaces the internal `AppDbContext` from a `public` base.
+    Every test class lives in the same assembly, so derived-and-same-assembly is the right
+    accessibility — a plain `protected` member exposing an internal type fails to compile.
+  - **Unfiltered access.** `context.Set<T>()` / `context.Shoplists` bypass the `OwnerId` filter
+    (which lives only in `CurrentUserShoplists()`), so assertions can see across users and prove
+    orphan removal. The `asUser` priming exists only to satisfy the `AppDbContext` constructor's
+    `ICurrentUser` dependency; it does not scope `Set<T>()`.
+
+Convention: **handler-arrange and read-back-through-queries stay the default**; `ExecuteDbAsync` is
+reserved for what handlers genuinely can't express or observe. Cross-user *arrange* uses
+`CreateShoplist` with `asUser:` rather than DB seeding wherever the handler can express it — the seed
+is only for state outside the handler vocabulary (e.g. a specific position layout).
+
+A single generic primitive was chosen over the speculated typed `AddAsync` / `FindAsync` /
+`CountAsync` helpers: one seam, and a lambda expresses any EF Core operation (`Add`, `Set<T>()`,
+`CountAsync`, `AnyAsync`, …). Revisit a typed convenience layer only if call sites show enough
+repetition to justify it.
 
 ## Alternatives considered
 
@@ -253,10 +309,9 @@ tests from accidentally relying on tracked entities bleeding between arrange/act
 
 ### Future extension points (deliberately deferred)
 
-- **`AddAsync<T>` / `FindAsync<T>` / `CountAsync<T>` helpers on the fixture** for tests that need
-  to set up or assert raw DB state without going through the mediator (and therefore bypassing the
-  `CurrentUserShoplists()` filter). Add when the first test actually needs them — speculative
-  helpers grow stale.
+- ~~**`AddAsync<T>` / `FindAsync<T>` / `CountAsync<T>` helpers on the fixture**~~ — **Realized
+  2026-06-02**, as a single generic `ExecuteDbAsync` primitive rather than typed helpers. See
+  *Direct database access (arrange/assert escape hatch)* under Decision above.
 - **HTTP-level smoke tests via `WebApplicationFactory`** for thin per-feature endpoint coverage.
   Add only if endpoint logic ever grows beyond `sender.Send(...).ToHttpResult()`.
 

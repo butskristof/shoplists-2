@@ -182,13 +182,52 @@ bootstrap the test project first.
 8. ~~**Extend `.github/workflows/pr-validation.yml`**~~ ✓ Already wired —
    `dotnet test --solution Shoplists.slnx --no-build` picks up new test projects automatically
    via slnx; GitHub-hosted `ubuntu-latest` runners ship with Docker for Testcontainers.
-9. Backfill tests for existing handlers opportunistically when touching them. Don't block on a
-   coverage pass.
-10. Adopt TDD-first for new handlers going forward.
+9. ~~Backfill tests for existing handlers.~~ ✓ Done as a deliberate pass (2026-06-02) rather than
+   opportunistically — all ten handlers now have integration coverage. See Progress entry.
+10. Adopt TDD-first for new handlers going forward. **← now the active mode.**
 
 ---
 
 ## Progress
+
+- **2026-06-02** — Integration coverage backfilled across all existing handlers + direct-DB escape
+  hatch added.
+  - Went past the `CreateShoplist` spike to cover every handler: `GetShoplists`, `GetShoplist`,
+    `UpdateShoplist`, `DeleteShoplist`, and all five item handlers (`CreateShoplistItem`,
+    `UpdateShoplistItem`, `UpdateShoplistItemFulfilled`, `UpdateShoplistItemPosition`,
+    `DeleteShoplistItem`). One file per use case, item handlers nested under `Features/Shoplists/Items/`
+    mirroring source. ~32 new tests (≈43 total). All green; CI picks them up via slnx.
+  - **Infra — direct DB access for arrange/assert.** Some scenarios can't go through the mediator
+    surface: seeding out-of-order positions or other users' data, and *verifying* state no handler
+    can observe (the cascade-delete proof — after a list is deleted, no query can reach its orphaned
+    items). Added:
+    - `InternalsVisibleTo("Shoplists.Application.IntegrationTests")` on `Persistence.csproj` so tests
+      can resolve the concrete (internal) `AppDbContext` and reach `Set<ShoplistItem>()` (unreachable
+      via `IAppDbContext`, which exposes only `Shoplists` + `CurrentUserShoplists()`). Sanctioned
+      test-only access; the production rule (external code uses `IAppDbContext`) still holds.
+    - `ExecuteDbAsync(Func<AppDbContext, ValueTask>[, asUser])` + `<TResult>` overload on
+      `IntegrationTestBase` — fresh scope per call (mirrors `SendAsync`), so reads reflect committed
+      state with no change-tracker bleed. `private protected` because it surfaces the internal
+      `AppDbContext` from a public base. Access is UNFILTERED (`Set<T>()` / `Shoplists` bypass the
+      `OwnerId` filter, which lives only in `CurrentUserShoplists()`); `asUser` priming just satisfies
+      the ctor.
+  - **Conventions settled during the backfill** (now also in `AGENTS.md` → Backend Conventions →
+    Testing):
+    - **Boundary-per-handler isolation, validation-once.** The cross-user `NotFound` boundary is
+      asserted on every id-taking handler (each calls `CurrentUserShoplists()` independently, so a
+      regression in one wouldn't be caught by testing another). The validation-short-circuit /
+      persists-nothing characterisation stays a single representative test in `CreateShoplistTests`;
+      per-rule shape validation is already covered by `Application.UnitTests` validators.
+    - **Handler-arrange by default**, reading state back through query handlers (`GetShoplist` /
+      `GetShoplists`). `ExecuteDbAsync` reserved for what handlers can't express/observe. Cross-user
+      arrange uses `CreateShoplist` with `asUser:` rather than DB seeding, where the handler can
+      express it.
+    - **Inline arrange asserts dropped.** Verified `ErrorOr<T>.Value` returns `default` (not a throw)
+      on an error state, so a broken arrange surfaces via the subsequent `.Value` use; tests assert
+      only their own responsibility, not the success of arrange steps.
+  - **Parked for the next checkpoint**: the "create list (+ item)" arrange now repeats ~20× inline.
+    Agreed to extract a small arrange helper on the base (assert success once, return the id) — design
+    discussion deferred until the tests themselves are reviewed.
 
 - **2026-05-31** — Integration test user-acting surface simplified to a per-send override.
   - Replaced the mutable `SetUserId(...)` / `private set` `CurrentUserId` pair with a read-only
