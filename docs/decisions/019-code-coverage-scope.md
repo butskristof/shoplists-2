@@ -74,3 +74,13 @@ integration test projects need no explicit entry.
   `ModulePaths` exclude list here, or it will be counted.
 - The settings path is passed **absolute** in CI: `--solution` launches each test app in its own
   working directory, so a relative path would not resolve consistently.
+- **Branch coverage is not unioned across per-project reports.** Each test project writes its own
+  Cobertura file and ReportGenerator merges them, but for a given line it takes the *maximum*
+  branch coverage seen in any single report — it does **not** OR the individual branch outcomes
+  together. So a branch whose two sides are exercised by *different* assemblies (e.g. the
+  `AddPersistence` connection-string guard: `Persistence.UnitTests` hits the throw, the integration
+  tests hit the continue) reads as 50% covered even though the suite covers both sides. The fix is
+  to make the relevant branches reachable *within a single test project* rather than chasing a
+  reporting artifact — see `AddPersistenceTests` for the happy-path cases that close that line
+  inside `Persistence.UnitTests`. Before treating a "missing" branch as a real gap, check whether
+  it's already covered in a sibling report.

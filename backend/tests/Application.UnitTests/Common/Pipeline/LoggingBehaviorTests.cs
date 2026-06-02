@@ -52,4 +52,34 @@ public sealed class LoggingBehaviorTests
         var error = _logger.Collector.GetSnapshot().Single(r => r.Level == LogLevel.Error);
         await Assert.That(error.Exception).IsSameReferenceAs(thrown);
     }
+
+    [Test]
+    public async Task Handle_WhenMessageTypeIsTopLevel_FallsBackToMessageTypeName()
+    {
+        // Request records are normally nested in their use-case class (e.g. CreateShoplist.Request),
+        // so DeclaringType is non-null. A top-level message has a null DeclaringType, exercising the
+        // `?? typeof(TMessage).Name` fallback in handler-name resolution.
+        var logger = new FakeLogger<LoggingBehavior<TopLevelMessage, TestResponse>>();
+        var sut = new LoggingBehavior<TopLevelMessage, TestResponse>(logger);
+
+        await sut.Handle(
+            new TopLevelMessage(),
+            (_, _) => ValueTask.FromResult(new TestResponse()),
+            CancellationToken.None
+        );
+
+        var handler = logger
+            .Collector.GetSnapshot()[0]
+            .StructuredState!.Single(kv =>
+                string.Equals(kv.Key, "Handler", StringComparison.Ordinal)
+            )
+            .Value;
+        await Assert.That(handler).IsEqualTo(nameof(TopLevelMessage));
+    }
 }
+
+// Deliberately top-level (not nested) so typeof(TopLevelMessage).DeclaringType is null. Kept in
+// this file alongside the test that uses it; the file-name rule doesn't earn its own file here.
+#pragma warning disable MA0048 // File name must match type name
+internal sealed record TopLevelMessage : IMessage;
+#pragma warning restore MA0048
