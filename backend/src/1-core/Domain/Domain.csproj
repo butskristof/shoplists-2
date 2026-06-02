@@ -3,6 +3,7 @@
     <AssemblyName>Shoplists.Domain</AssemblyName>
     <RootNamespace>Shoplists.Domain</RootNamespace>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="StronglyTypedId" PrivateAssets="all" ExcludeAssets="runtime" />
