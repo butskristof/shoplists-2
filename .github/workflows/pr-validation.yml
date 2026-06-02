@@ -72,6 +72,9 @@ jobs:
           reports: ${{ github.workspace }}/backend/**/TestResults/**/coverage.cobertura.xml
           targetdir: ${{ github.workspace }}/coverage-report
           reporttypes: Cobertura;MarkdownSummaryGithub
+          # Whitelist our own assemblies' classes; drops source-generated noise
+          # (e.g. Mediator.*) that would otherwise pollute the per-class table.
+          classfilters: +Shoplists.*
 
       - name: Write coverage to job summary
         if: always()
