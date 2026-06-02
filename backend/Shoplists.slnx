@@ -24,6 +24,7 @@
     <Project Path="src/3-hosts/DatabaseMigrator/DatabaseMigrator.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <File Path="tests/code-coverage.settings.xml" />
     <Project Path="tests/Application.IntegrationTests/Application.IntegrationTests.csproj" />
     <Project Path="tests/Application.UnitTests/Application.UnitTests.csproj" />
     <Project Path="tests/Domain.UnitTests/Domain.UnitTests.csproj" />

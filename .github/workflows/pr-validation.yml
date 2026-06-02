@@ -55,12 +55,16 @@ jobs:
 
       # MTP flags after `--`. Each project writes its TRX + Cobertura into its own
       # bin/**/TestResults/ dir (auto-named TRX, fixed coverage filename).
+      # Coverage scope (generated code, test utils) is defined entirely in the
+      # settings file -- see tests/code-coverage.settings.xml and ADR 019. Path must
+      # be absolute: --solution launches each test app in its own working directory.
       - name: Test
         run: >
           dotnet test --solution Shoplists.slnx --no-build
           --
           --report-trx
           --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+          --coverage-settings ${{ github.workspace }}/backend/tests/code-coverage.settings.xml
 
       # --- Reporting (tier 1: permission-free, always runs incl. Dependabot/forks) ---
 
@@ -72,9 +76,6 @@ jobs:
           reports: ${{ github.workspace }}/backend/**/TestResults/**/coverage.cobertura.xml
           targetdir: ${{ github.workspace }}/coverage-report
           reporttypes: Cobertura;MarkdownSummaryGithub
-          # Whitelist our own assemblies' classes; drops source-generated noise
-          # (e.g. Mediator.*) that would otherwise pollute the per-class table.
-          classfilters: +Shoplists.*
 
       - name: Write coverage to job summary
         if: always()

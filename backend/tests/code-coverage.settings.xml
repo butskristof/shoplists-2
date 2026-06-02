@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Microsoft.Testing.Platform code coverage settings, applied via the
+  "coverage-settings" option in CI. See docs/decisions/019-code-coverage-scope.md
+  for the reasoning.
+-->
+<Configuration>
+    <CodeCoverage>
+        <ModulePaths>
+            <Exclude>
+                <!-- Test scaffolding, not a system under test. -->
+                <ModulePath>.*Shoplists\.Testing\.Common\.dll$</ModulePath>
+            </Exclude>
+        </ModulePaths>
+        <Attributes>
+            <Exclude>
+                <!--
+          Exclude truly generated code (StronglyTypedId IDs + converters, Mediator
+          registrations, EF Core migrations). NOTE: do NOT add CompilerGeneratedAttribute
+          here - that would also drop async/await, yield, and lambda code from real methods.
+        -->
+                <Attribute>^System\.CodeDom\.Compiler\.GeneratedCodeAttribute$</Attribute>
+                <Attribute>^System\.Diagnostics\.CodeAnalysis\.ExcludeFromCodeCoverageAttribute$</Attribute>
+                <Attribute>^System\.Diagnostics\.DebuggerHiddenAttribute$</Attribute>
+                <Attribute>^System\.Diagnostics\.DebuggerNonUserCodeAttribute$</Attribute>
+            </Exclude>
+        </Attributes>
+    </CodeCoverage>
+</Configuration>

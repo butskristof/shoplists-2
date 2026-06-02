@@ -262,6 +262,10 @@ Full conventions: `docs/projects/testing/plan.md`; architecture: ADR 014 (framew
     `Testing.Common` builders) or verifying raw state (e.g. cascade deletes). Prefer the handler path;
     reach for it only when necessary.
 - New backend handlers go **TDD-first** — red/green/refactor against the mediator request.
+- **Coverage scope** lives entirely in `backend/tests/code-coverage.settings.xml` (applied in CI
+  via `--coverage-settings`); generated code (`[GeneratedCode]`) and `Shoplists.Testing.Common` are
+  excluded there, not via report-level filters. A new test-only/support assembly must be added to
+  its `ModulePaths` exclude. See ADR 019.
 
 ---
 
