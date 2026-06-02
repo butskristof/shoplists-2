@@ -1,14 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <AssemblyName>Shoplists.Testing.Common</AssemblyName>
     <RootNamespace>Shoplists.Testing.Common</RootNamespace>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\1-core\Domain\Domain.csproj" />
   </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="TUnit.Core" />
   </ItemGroup>

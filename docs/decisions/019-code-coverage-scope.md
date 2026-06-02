@@ -32,10 +32,16 @@ whatever the collector produced.
 The settings file excludes:
 
 - **Generated code, by the `GeneratedCodeAttribute`.** This is the precise, intent-matching signal —
-  it drops StronglyTypedId IDs + their converters, Mediator registrations, and EF Core migrations
-  uniformly, in any assembly. We deliberately do **not** exclude `CompilerGeneratedAttribute`: per
-  the [Microsoft docs](https://learn.microsoft.com/visualstudio/test/customizing-code-coverage-analysis#include-or-exclude-assemblies-and-members),
+  it drops StronglyTypedId IDs + their converters and Mediator registrations uniformly, in any
+  assembly. We deliberately do **not** exclude `CompilerGeneratedAttribute`: per the
+  [Microsoft docs](https://learn.microsoft.com/visualstudio/test/customizing-code-coverage-analysis#include-or-exclude-assemblies-and-members),
   that would also drop `async`/`await`, `yield`, lambdas, and auto-properties from *real* methods.
+- **EF Core migrations and the design-time `DbContext` factory, by `Functions` name** —
+  `Shoplists.Persistence.Migrations.*` and `Shoplists.Persistence.DesignTimeDbContextFactory.*`.
+  These are infrastructure that is not meaningfully unit-testable (migration `Up`/`Down` bodies; a
+  factory used only by the EF CLI at design time). Note migrations are **not** marked
+  `[GeneratedCode]`, so the attribute rule above does not catch them — hence the explicit
+  function-name exclude.
 - **The `Shoplists.Testing.Common` module**, via a `ModulePaths` exclude — test utilities, not a SUT.
 - The standard `DebuggerHidden` / `DebuggerNonUserCode` / `ExcludeFromCodeCoverage` attributes
   (sensible defaults, kept explicit since supplying a settings file replaces the implicit set).

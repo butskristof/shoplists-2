@@ -1,15 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AssemblyName>Shoplists.Persistence</AssemblyName>
     <RootNamespace>Shoplists.Persistence</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Shoplists.Application.IntegrationTests" />
+    <ProjectReference Include="..\..\1-core\Application\Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\1-core\Application\Application.csproj" />
+    <InternalsVisibleTo Include="Shoplists.Application.IntegrationTests" />
   </ItemGroup>
 
   <ItemGroup>

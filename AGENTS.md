@@ -242,8 +242,8 @@ TUnit projects under `backend/tests/`, run via MTP-native `dotnet test --solutio
 Full conventions: `docs/projects/testing/plan.md`; architecture: ADR 014 (framework) + ADR 018
 (integration tests).
 
-- **Unit** — `Domain.UnitTests` (entity invariants), `Application.UnitTests` (validators / validation
-  helpers); no DB.
+- **Unit** — `Domain.UnitTests` (entity invariants), `Application.UnitTests` (validators, validation
+  helpers, pipeline behaviours), `Persistence.UnitTests` (DI registration guards); no DB.
 - **Handler integration** — `Application.IntegrationTests`, rooted at the mediator boundary
   (`SendAsync` of Request records) against a real Testcontainers PostgreSQL. One file per use case,
   mirroring `Features/…`.
@@ -262,6 +262,10 @@ Full conventions: `docs/projects/testing/plan.md`; architecture: ADR 014 (framew
     `Testing.Common` builders) or verifying raw state (e.g. cascade deletes). Prefer the handler path;
     reach for it only when necessary.
 - New backend handlers go **TDD-first** — red/green/refactor against the mediator request.
+- **Test doubles** — no mocking library. Use the first-party `Microsoft.Extensions.*.Testing` fakes:
+  `FakeTimeProvider` for time, `FakeLogger<T>` for logging (assert on `Collector.GetSnapshot()` by
+  level + attached exception, not rendered message text). Do not mock `ILogger` directly — its
+  `Log*` methods are extensions over a single `Log<TState>` call.
 - **Coverage scope** lives entirely in `backend/tests/code-coverage.settings.xml` (applied in CI
   via `--coverage-settings`); generated code (`[GeneratedCode]`) and `Shoplists.Testing.Common` are
   excluded there, not via report-level filters. A new test-only/support assembly must be added to

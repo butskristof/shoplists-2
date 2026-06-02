@@ -15,9 +15,11 @@
         <Attributes>
             <Exclude>
                 <!--
-          Exclude truly generated code (StronglyTypedId IDs + converters, Mediator
-          registrations, EF Core migrations). NOTE: do NOT add CompilerGeneratedAttribute
-          here - that would also drop async/await, yield, and lambda code from real methods.
+          Exclude truly generated code marked with [GeneratedCode]: StronglyTypedId IDs (+
+          their converters), Mediator registrations, ...
+          NOTE: EF Core migrations are NOT marked [GeneratedCode] and are handled
+          separately under Functions below. Do NOT add CompilerGeneratedAttribute here;
+          that would also drop async/await, yield, and lambda code from real methods.
         -->
                 <Attribute>^System\.CodeDom\.Compiler\.GeneratedCodeAttribute$</Attribute>
                 <Attribute>^System\.Diagnostics\.CodeAnalysis\.ExcludeFromCodeCoverageAttribute$</Attribute>
@@ -25,5 +27,17 @@
                 <Attribute>^System\.Diagnostics\.DebuggerNonUserCodeAttribute$</Attribute>
             </Exclude>
         </Attributes>
+        <Functions>
+            <Exclude>
+                <!--
+          Infrastructure that is not meaningfully unit-testable, excluded by intent
+          (ADR 019), matched by fully-qualified name: EF Core migrations (Up/Down; they
+          are not [GeneratedCode]) and the design-time DbContext factory used only by the
+          EF CLI at design time, never at runtime.
+        -->
+                <Function>^Shoplists\.Persistence\.Migrations\..*</Function>
+                <Function>^Shoplists\.Persistence\.DesignTimeDbContextFactory.*</Function>
+            </Exclude>
+        </Functions>
     </CodeCoverage>
 </Configuration>
