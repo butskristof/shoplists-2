@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Restrictive default; the backend job widens this for test/coverage reporting.
+permissions:
+  contents: read
+
 jobs:
   frontend:
     name: Frontend
@@ -27,6 +31,13 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    # contents: read for checkout; checks/pull-requests: write let the reporting
+    # steps post a check run and PR comments. These writes are NOT granted on
+    # Dependabot or fork PRs (read-only token) — those steps are guarded below.
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     defaults:
       run:
         working-directory: backend
@@ -41,4 +52,58 @@ jobs:
       - run: dotnet format style --no-restore --verify-no-changes
       - run: dotnet format analyzers --no-restore --verify-no-changes
       - run: dotnet build --no-restore
-      - run: dotnet test --solution Shoplists.slnx --no-build
+
+      # MTP flags after `--`. Each project writes its TRX + Cobertura into its own
+      # bin/**/TestResults/ dir (auto-named TRX, fixed coverage filename).
+      - name: Test
+        run: >
+          dotnet test --solution Shoplists.slnx --no-build
+          --
+          --report-trx
+          --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+
+      # --- Reporting (tier 1: permission-free, always runs incl. Dependabot/forks) ---
+
+      # Merge per-project Cobertura into one report + a GitHub-flavoured markdown summary.
+      - name: Merge coverage reports
+        if: always()
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.5.10
+        with:
+          reports: ${{ github.workspace }}/backend/**/TestResults/**/coverage.cobertura.xml
+          targetdir: ${{ github.workspace }}/coverage-report
+          reporttypes: Cobertura;MarkdownSummaryGithub
+          # Whitelist our own assemblies' classes; drops source-generated noise
+          # (e.g. Mediator.*) that would otherwise pollute the per-class table.
+          classfilters: +Shoplists.*
+
+      - name: Write coverage to job summary
+        if: always()
+        run: cat ${{ github.workspace }}/coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test & coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: |
+            ${{ github.workspace }}/backend/**/TestResults/**/*.trx
+            ${{ github.workspace }}/coverage-report/Cobertura.xml
+          retention-days: 7
+
+      # --- Reporting (tier 2: needs write token, human PRs only) ---
+      # Guard skips Dependabot (read-only token despite same-repo head), forks, and
+      # workflow_dispatch (no PR context). On those, tier 1 above is the fallback.
+
+      - name: Publish test results
+        if: always() && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: EnricoMi/publish-unit-test-result-action@v2.23.0
+        with:
+          files: backend/**/TestResults/**/*.trx
+
+      - name: Comment coverage on PR
+        if: always() && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: marocchino/sticky-pull-request-comment@v3.0.4
+        with:
+          header: backend-coverage
+          recreate: true
+          path: ${{ github.workspace }}/coverage-report/SummaryGithub.md
