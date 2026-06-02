@@ -200,6 +200,26 @@ A single generic primitive was chosen over the speculated typed `AddAsync` / `Fi
 `CountAsync`, `AnyAsync`, …). Revisit a typed convenience layer only if call sites show enough
 repetition to justify it.
 
+### Host-layer logic units (`Api.UnitTests`)
+
+The "HTTP concerns are transport, not covered" boundary above scopes out *wiring* — model
+binding, endpoint dispatch, middleware, DI/route registration, and the invocation path of the
+`ErrorOr → IResult` mapping. It does **not** scope out the two pieces of genuine, hand-written
+*logic* that happen to live in the `Api` host:
+
+- **`ErrorOrExtensions.ToErrorResult`** — the [ADR 002](002-error-result-pattern.md) error
+  contract: all-validation grouping into a `ValidationProblem` vs the `ErrorType → status` switch.
+  A regression here silently changes every error response the API emits.
+- **`HttpContextCurrentUser`** — `sub`-claim extraction and the missing/blank-claim guard.
+
+These are covered by plain unit tests in `tests/Api.UnitTests/` — **no `WebApplicationFactory`**.
+`ToHttpResult` is reached through its `internal` extension surface (`InternalsVisibleTo` on
+`Api.csproj`); `HttpContextCurrentUser` via a stub `IHttpContextAccessor` over a
+`DefaultHttpContext`. The thin endpoint dispatchers, `Program.cs`, DI/route wiring, and the
+OpenAPI transformers remain deliberately untested — they are the transport/wiring this ADR scopes
+out. Consequence for the coverage number: see [ADR 019](019-code-coverage-scope.md) (`Shoplists.Api`
+is now instrumented and reads intentionally low).
+
 ## Alternatives considered
 
 - **`WebApplicationFactory<TEntryPoint>`** — Forces the HTTP boundary on every test. Adds JSON

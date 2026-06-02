@@ -33,7 +33,7 @@ internal sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAcc
         {
             var sub = FindFirstClaimValue("sub");
 
-            if (string.IsNullOrEmpty(sub))
+            if (string.IsNullOrWhiteSpace(sub))
                 throw new InvalidOperationException(
                     "No 'sub' claim found on the authenticated user. Ensure JWT Bearer authentication is configured correctly."
                 );

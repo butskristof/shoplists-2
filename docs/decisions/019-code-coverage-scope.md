@@ -72,6 +72,15 @@ integration test projects need no explicit entry.
 - A new source generator that stamps `[GeneratedCode]` is excluded automatically — no action needed.
 - A new **support/test-only assembly** (another `Testing.*` library) must be added to the
   `ModulePaths` exclude list here, or it will be counted.
+- **`Shoplists.Api` is instrumented and reports intentionally low coverage.** `Api.UnitTests`
+  references the `Api` host, so that assembly is now loaded during the test run and counted. Only
+  the two hand-written logic units are tested — `ErrorOrExtensions.ToErrorResult` and
+  `HttpContextCurrentUser` (see [ADR 018](018-backend-integration-test-architecture.md)); the rest
+  of the host (`Program.cs`, thin endpoint dispatchers, DI/route wiring, OpenAPI transformers) is
+  the deliberately-untested transport layer, so the assembly's number reads low **by design**. We
+  deliberately do **not** add per-file `Functions` excludes for that wiring: the list would be
+  "everything except two files" — brittle to maintain and re-introducing exactly the split-scope
+  this ADR removed. Read the low `Api` number as "mostly intentional wiring," not a gap to close.
 - The settings path is passed **absolute** in CI: `--solution` launches each test app in its own
   working directory, so a relative path would not resolve consistently.
 - **Branch coverage is not unioned across per-project reports.** Each test project writes its own
