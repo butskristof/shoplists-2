@@ -16,15 +16,15 @@
   },
   "dependencies": {
     "@nuxt/fonts": "^0.14.0",
-    "@nuxtjs/color-mode": "^4.0.0",
+    "@nuxtjs/color-mode": "^4.0.1",
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/auto-instrumentations-node": "^0.76.0",
-    "@opentelemetry/sdk-node": "^0.218.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.77.0",
+    "@opentelemetry/sdk-node": "^0.219.0",
     "@primeuix/themes": "^2.0.3",
-    "@tanstack/vue-query": "^5.100.14",
+    "@tanstack/vue-query": "^5.101.1",
     "@vite-pwa/nuxt": "^1.1.1",
     "@vueuse/router": "^14.3.0",
-    "ioredis": "^5.11.0",
+    "ioredis": "^5.11.1",
     "nuxt": "^4.4.7",
     "nuxt-oidc-auth": "^1.0.0-beta.11",
     "nuxt-security": "^2.6.0",
@@ -36,16 +36,14 @@
     "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^9.0.0",
-    "@nuxt/eslint": "^1.15.2",
+    "@antfu/eslint-config": "^9.1.0",
+    "@nuxt/eslint": "^1.16.0",
     "@primevue/nuxt-module": "^4.5.5",
     "@vite-pwa/assets-generator": "^1.0.2",
     "eslint-plugin-format": "^2.0.1",
-    "openapi-typescript": "^7.13.0"
+    "openapi-typescript": "^7.13.0",
+    "vue-tsc": "^3.3.5"
   },
   "//overrides": "Each entry below patches a transitively-pulled vulnerable dep. See docs/security/overrides.md for advisory IDs, parent deps, and removal conditions. Review on every npm audit / deps-upgrade pass.",
-  "overrides": {
-    "protobufjs": "^8.0.3",
-    "serialize-javascript": "^7.0.5"
-  }
+  "overrides": {}
 }
