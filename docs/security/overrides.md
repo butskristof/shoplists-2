@@ -6,61 +6,37 @@ policy. Re-read on every `npm audit` cleanup or deps-upgrade pass; for each
 entry, temporarily remove the override, run `npm install` + `npm audit`, and
 remove if no longer load-bearing.
 
-## protobufjs
+## No active overrides
 
-- **Pinned**: `^8.0.3` (minimum patched range; latest at time of writing is
-  `8.2.0`)
-- **Advisories**:
-  - [GHSA-q6x5-8v7m-xcrf](https://github.com/advisories/GHSA-q6x5-8v7m-xcrf) — overlong UTF-8 decoding
-  - [GHSA-2pr8-phx7-x9h3](https://github.com/advisories/GHSA-2pr8-phx7-x9h3) — DoS via crafted field names
-  - [GHSA-66ff-xgx4-vchm](https://github.com/advisories/GHSA-66ff-xgx4-vchm) — code injection through bytes-field defaults
-  - [GHSA-fx83-v9x8-x52w](https://github.com/advisories/GHSA-fx83-v9x8-x52w) — prototype injection in generated constructors
-  - [GHSA-75px-5xx7-5xc7](https://github.com/advisories/GHSA-75px-5xx7-5xc7) — code-generation gadget after prototype pollution
-  - [GHSA-jvwf-75h9-cwgg](https://github.com/advisories/GHSA-jvwf-75h9-cwgg) — process-wide DoS through unsafe option paths
-  - [GHSA-685m-2w69-288q](https://github.com/advisories/GHSA-685m-2w69-288q) — DoS via unbounded protobuf recursion
+Both prior entries were removed on 2026-06-27 once the dependency tree resolved
+to non-vulnerable versions without them:
 
-  Vulnerable range: `>=8.0.0 <=8.0.1`. Patched in `8.0.2+`.
-- **Parent dep**: `@opentelemetry/otlp-transformer@0.217.0` (pulled in by
-  `@opentelemetry/sdk-node@^0.217.0` via the Nitro telemetry plugin in
-  `frontend/server/plugins/telemetry.ts`). The transformer **pins
-  `protobufjs: '8.0.1'` exactly** in its manifest, so the override is the only
-  way to lift the resolved version without changing direct deps.
+- **protobufjs** — `@opentelemetry/otlp-transformer` no longer pins protobufjs
+  directly; it now resolves via `@grpc/proto-loader@0.8.1` (`protobufjs: ^7.5.5`),
+  landing on `7.6.4`. The advisories that motivated the override affect the 8.x
+  line only, so the 7.x fallback is clean.
+- **serialize-javascript** — the workbox build path now pulls
+  `@rollup/plugin-terser@1.0.0` (`serialize-javascript: ^7.x`), resolving to
+  `7.0.6` on its own.
 
-  `0.216.0` and `0.217.0` both pin exactly. `0.215.0` used `^8.0.1` (would
-  resolve correctly on its own) but is not the version we want to be on.
-  `npm audit fix --force` "fixes" by downgrading `sdk-node` to `0.215.0` — see
-  ADR 017 for why we reject that path.
-- **Risk for this project**: low. Used server-side (Nitro) for outbound OTLP
-  export only; the protobuf decoder never sees attacker-controlled bytes. All
-  listed advisories require the attacker to feed protobuf input into our
-  decoder. We patch anyway to keep `npm audit` clean and avoid future drift.
-- **Added**: 2026-05-13 (commit pending).
-- **Removal condition**: remove when `@opentelemetry/otlp-transformer` ships a
-  version (likely `0.218.0+`) whose `dependencies.protobufjs` allows `>=8.0.2`
-  — check with `npm view @opentelemetry/otlp-transformer@latest dependencies.protobufjs`.
+## Accepted advisories (not overridden)
 
-## serialize-javascript
+Low-risk transitive advisories we deliberately do not fix, recorded here so
+`npm audit` output isn't re-investigated from scratch each pass.
 
-- **Pinned**: `^7.0.5`
-- **Advisories**:
-  - [GHSA-76p7-773f-r4q5](https://github.com/advisories/GHSA-76p7-773f-r4q5) — XSS via insufficient escaping (original motivation, PR #54)
-  - [GHSA-5c6j-r48x-rmvq](https://github.com/advisories/GHSA-5c6j-r48x-rmvq) — RCE via `RegExp.flags` / `Date.prototype.toISOString`
-  - [GHSA-qj8w-gfj5-8c6v](https://github.com/advisories/GHSA-qj8w-gfj5-8c6v) — CPU-exhaustion DoS via crafted array-likes
+### esbuild
 
-  Vulnerable range: `<=7.0.4` across all majors. **The 6.x line was never
-  patched** — fixes only landed in 7.0.5+.
-- **Parent dep**: `@vite-pwa/nuxt → vite-plugin-pwa → workbox-build →
-  @rollup/plugin-terser@0.4.4`, which declares `serialize-javascript: ^6.0.1`.
-  Without the override the tree resolves to `serialize-javascript@6.0.2`,
-  which `npm audit` still flags. The newer `@rollup/plugin-terser@1.0.0`
-  (used via `nitropack` on a separate path) declares `^7.0.3` and resolves
-  correctly without help; the override exists for the workbox path.
-- **Risk for this project**: low. Build-time only — `workbox-build` runs
-  during `nuxt build` to emit the service worker. Not in the runtime bundle,
-  not on the request path. The advisories require attacker-controlled input
-  to `serialize-javascript`, which the workbox build does not receive.
-- **Added**: 2026-04-20 (PR #54, commit `43e1276`).
-- **Removal condition**: remove when `workbox-build` releases a version that
-  uses `@rollup/plugin-terser@>=1.0.0` (or any version whose
-  `serialize-javascript` range starts at `^7.0.5` or `^6.0.3+`, neither of
-  which exist at time of writing).
+- **Advisory**: [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr)
+  — arbitrary file read via the esbuild dev server on Windows. Severity: low.
+- **Vulnerable copy**: `esbuild@0.27.7`, pulled transitively by `vite@7.x` and
+  `@nuxt/fonts`. (The `esbuild@0.28.1` under `nitropack` is already out of range.)
+- **Risk for this project**: negligible. Dev-server/build-time only — never in
+  the production bundle or on the request path — and the advisory is
+  Windows-specific, while local dev is on macOS.
+- **Why not fixed**: `vite` pins esbuild to `^0.27.x`, so lifting it to a patched
+  `>0.28.0` requires forcing a breaking `vite`/`nuxt` toolchain bump
+  (`npm audit fix --force`), which our policy rejects. An `overrides` entry
+  forcing esbuild `0.28` risks breaking vite's tight esbuild API coupling.
+- **Removal condition**: drop this note once `vite`/`nuxt` adopt esbuild `>=0.28.1`
+  on their own and `npm audit` no longer reports it.
+- **Recorded**: 2026-06-27.
