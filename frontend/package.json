@@ -42,7 +42,7 @@
     "@vite-pwa/assets-generator": "^1.0.2",
     "eslint-plugin-format": "^2.0.1",
     "openapi-typescript": "^7.13.0",
-    "vue-tsc": "^3.3.5"
+    "vue-tsc": "^3.3.6"
   },
   "//overrides": "Each entry below patches a transitively-pulled vulnerable dep. See docs/security/overrides.md for advisory IDs, parent deps, and removal conditions. Review on every npm audit / deps-upgrade pass.",
   "overrides": {}
