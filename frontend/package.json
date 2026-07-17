@@ -30,7 +30,7 @@
     "nuxt-security": "^2.6.0",
     "openapi-fetch": "^0.17.0",
     "primeicons": "^7.0.0",
-    "primevue": "^4.5.5",
+    "primevue": "^5.0.0",
     "vue": "^3.5.35",
     "vue-draggable-plus": "^0.6.1",
     "vue-router": "^5.1.0"
@@ -38,7 +38,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "^9.1.0",
     "@nuxt/eslint": "^1.16.0",
-    "@primevue/nuxt-module": "^4.5.5",
+    "@primevue/nuxt-module": "^5.0.0",
     "@vite-pwa/assets-generator": "^1.0.2",
     "eslint-plugin-format": "^2.0.1",
     "openapi-typescript": "^7.13.0",
