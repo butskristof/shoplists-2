@@ -71,7 +71,7 @@ jobs:
       # Merge per-project Cobertura into one report + a GitHub-flavoured markdown summary.
       - name: Merge coverage reports
         if: always()
-        uses: danielpalme/ReportGenerator-GitHub-Action@5.5.10
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.5.11
         with:
           reports: ${{ github.workspace }}/backend/**/TestResults/**/coverage.cobertura.xml
           targetdir: ${{ github.workspace }}/coverage-report
